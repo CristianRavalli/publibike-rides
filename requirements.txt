@@ -1,0 +1,7 @@
+# Der Download (python3 -m publibike_rides) läuft ohne diese Pakete —
+# er nutzt nur die Standardbibliothek. Gebraucht werden sie erst für die
+# Analyse im Notebook.
+pandas>=2.2
+folium>=0.17
+matplotlib>=3.9
+jupyter>=1.1
