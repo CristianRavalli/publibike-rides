@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import argparse
 import csv
+import getpass
 import json
 import os
 import stat
@@ -97,6 +98,16 @@ def build_client(require_token: bool = True) -> PublibikeClient:
 # ------------------------------------------------------------------- Befehle
 
 
+def _prompt_hidden(prompt: str) -> str:
+    """Fragt etwas ab, ohne es im Terminal sichtbar zu machen."""
+    try:
+        return getpass.getpass(prompt).strip()
+    except (EOFError, getpass.GetPassWarning):
+        # Kein Terminal verfuegbar — dann eben mit Echo, aber mit Warnung.
+        print("  (Achtung: keine verdeckte Eingabe möglich, die Eingabe ist sichtbar)")
+        return input(prompt).strip()
+
+
 def cmd_login(_args: argparse.Namespace) -> None:
     stored = load_credentials()
     api_key = resolve_api_key(stored)
@@ -115,14 +126,17 @@ def cmd_login(_args: argparse.Namespace) -> None:
     print("Du bekommst gleich eine SMS mit einem Code.")
     print()
 
-    phone = input("Telefonnummer mit Landesvorwahl (z. B. +41791234567): ").strip()
+    # Beide Eingaben laufen ohne Echo: sonst stehen Telefonnummer und Code im
+    # Verlauf des Terminals und damit in Logs, Screenshots oder geteilten
+    # Sitzungen. Ohne Terminal (Pipe, CI) faellt getpass auf input zurueck.
+    phone = _prompt_hidden("Telefonnummer mit Landesvorwahl (z. B. +41791234567): ")
     try:
         login_token = client.start_login(phone)
     except (ApiError, ValueError) as exc:
         raise SystemExit(f"Anmeldung fehlgeschlagen: {exc}")
 
     print("SMS ist unterwegs.")
-    code = input("Code aus der SMS: ").strip()
+    code = _prompt_hidden("Code aus der SMS: ")
     try:
         token = client.verify_otp(login_token, code)
     except (ApiError, ValueError) as exc:

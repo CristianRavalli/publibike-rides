@@ -23,6 +23,10 @@ python3 -m publibike_rides
 Das war es. Der Befehl fragt nach deiner Telefonnummer, schickt dir eine SMS,
 fragt den Code ab und legt danach an:
 
+Beide Eingaben laufen **ohne Echo** — du siehst beim Tippen nichts. Das ist
+Absicht: sonst stehen Telefonnummer und Code im Verlauf des Terminals und
+landen in Screenshots, Logs oder geteilten Sitzungen.
+
 | Datei | Inhalt |
 |---|---|
 | `data/rides.csv` | deine Fahrten, so wie die API sie liefert |
