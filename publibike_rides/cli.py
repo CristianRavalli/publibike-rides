@@ -211,9 +211,15 @@ def cmd_enrich(_args: argparse.Namespace) -> None:
     rows, report = enrich_rides(rides, stations)
     write_rides_csv(rows, RIDES_GEO_CSV)
 
-    print(f"{report['rides']} Fahrten verarbeitet -> {RIDES_GEO_CSV}")
+    print(f"{report['rides']} Mieten verarbeitet -> {RIDES_GEO_CSV}")
+    print(f"  zusammenhängende Wege: {report['wege']}")
     print(f"  mit Koordinaten:  {report['mit_koordinaten']}")
     print(f"  ohne Koordinaten: {report['ohne_koordinaten']}")
+    print()
+    print("  Vorzeitig beendete Mieten:")
+    print(f"    Velo lief gar nicht erst:  {report['defekt_sofort']}")
+    print(f"    Velo fiel unterwegs aus:   {report['defekt_unterwegs']}")
+    print(f"    Gratiszeit zurückgesetzt:  {report['gratiszeit_zurueckgesetzt']}")
     for label, key in (
         ("Unbekannte Startstationen", "unbekannte_startstationen"),
         ("Unbekannte Zielstationen", "unbekannte_zielstationen"),

@@ -26,6 +26,9 @@ VEHICLE_LABELS = {1: "Velo", 2: "E-Bike"}
 
 OUTPUT_FIELDS = [
     "ride_id",
+    "journey_id",
+    "journey_leg",
+    "journey_legs",
     "start_date",
     "end_date",
     "date",
@@ -59,17 +62,23 @@ OUTPUT_FIELDS = [
 # Oberhalb dieser Luftliniengeschwindigkeit stimmt etwas nicht.
 MAX_PLAUSIBLE_SPEED_KMH = 40.0
 
-# Abgebrochene Miete: Velo genommen, es taugte nichts, sofort zurückgestellt
-# und das nächste genommen. Erkennbar an drei Dingen zusammen — die Fahrt
-# endet an der Startstation, sie dauerte fast nichts, und gleich darauf
-# beginnt die nächste Miete.
-#
-# Entscheidend ist dabei, dass das Velo nicht vom Fleck kam. Eine kurze Lücke
-# allein genügt nicht: wer irgendwo andockt und sofort weiterfährt, hat eine
-# Anschlussmiete, keinen Defekt. In einem Testdatensatz mit 258 Fahrten
-# trennte dieses Kriterium 11 Abbrüche sauber von 33 Anschlussmieten.
-MAX_ABORTED_RIDE_SECONDS = 180
+# Beginnt die nächste Miete innerhalb dieser Spanne, gehören beide zum selben
+# Weg. Die Lücke darf negativ sein — dann wurde das nächste Velo genommen,
+# bevor das vorherige verbucht war.
 MAX_GAP_TO_NEXT_SECONDS = 180
+
+# Ab dieser Fahrzeit ist eine sofortige Neumiete kein Defekt, sondern das
+# Zurücksetzen der Gratiszeit vor Ablauf der freien 30 Minuten.
+#
+# Die Grenze ist unempfindlich: in einem Testdatensatz mit 258 Fahrten
+# springen die Dauern von 896 Sekunden direkt auf 1565, dazwischen liegt
+# nichts. Jeder Wert zwischen 15 und 26 Minuten liefert dasselbe Ergebnis.
+FREE_WINDOW_RESET_SECONDS = 1200
+
+# Warum eine Miete vorzeitig endete.
+FLAG_DEFECT_IMMEDIATE = "defekt_sofort"      # Velo lief gar nicht erst
+FLAG_DEFECT_UNDERWAY = "defekt_unterwegs"    # Velo fiel nach kurzer Fahrt aus
+FLAG_FREE_WINDOW = "gratiszeit_zurueckgesetzt"
 
 
 def haversine_km(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
@@ -108,19 +117,32 @@ def _add_flag(row: dict, flag: str) -> None:
     row["quality_flag"] = ";".join(vorhanden)
 
 
-def _mark_aborted_rentals(
+def _chain_journeys(
     rows: List[dict], zeiten: List[Tuple[Optional[datetime], Optional[datetime]]]
 ) -> None:
-    """Trägt die Lücke zur nächsten Miete ein und markiert Abbrüche.
+    """Verkettet Mieten zu Wegen und benennt, warum eine Miete vorzeitig endete.
 
-    Die Lücke kann negativ sein — dann beginnt die nächste Miete, bevor die
-    vorherige verbucht wurde. Das kommt vor und ist für die Erkennung kein
-    Sonderfall, sondern ein besonders deutlicher Hinweis.
+    Folgt eine Miete dicht auf die vorherige, war es in Wahrheit eine Fahrt,
+    die in zwei Mieten zerfiel. Drei Gründe kommen vor:
+
+    * Das Velo lief gar nicht erst. Es kommt nicht vom Fleck, die Miete endet
+      an ihrer Startstation — ``defekt_sofort``.
+    * Das Velo fiel unterwegs aus. Man stellt es ab, wo man gerade ist, und
+      nimmt das nächste, um ans Ziel zu kommen — ``defekt_unterwegs``.
+    * Die Fahrt lief lange genug, dass eine neue Miete die Gratiszeit
+      zurücksetzt, bevor die freien 30 Minuten ablaufen —
+      ``gratiszeit_zurueckgesetzt``. Kein Defekt, aber derselbe Weg.
+
+    Ob die Miete an ihrer Startstation endete, trennt die beiden Defektarten.
+    Ob sie länger als ``FREE_WINDOW_RESET_SECONDS`` dauerte, trennt Defekt
+    von Absicht.
     """
     reihenfolge = sorted(
         (i for i, (start, _) in enumerate(zeiten) if start is not None),
         key=lambda i: zeiten[i][0],
     )
+
+    gehoert_zum_naechsten = set()
 
     for i, j in zip(reihenfolge, reihenfolge[1:]):
         ende_vorher = zeiten[i][1]
@@ -130,15 +152,38 @@ def _mark_aborted_rentals(
 
         luecke = (start_naechste - ende_vorher).total_seconds()
         rows[i]["gap_to_next_min"] = round(luecke / 60, 2)
+        if luecke > MAX_GAP_TO_NEXT_SECONDS:
+            continue
 
+        gehoert_zum_naechsten.add(i)
         dauer = rows[i]["duration_seconds"]
-        if (
-            luecke <= MAX_GAP_TO_NEXT_SECONDS
-            and rows[i]["is_round_trip"]
-            and isinstance(dauer, int)
-            and dauer <= MAX_ABORTED_RIDE_SECONDS
-        ):
-            _add_flag(rows[i], "miete_abgebrochen")
+
+        if isinstance(dauer, int) and dauer > FREE_WINDOW_RESET_SECONDS:
+            _add_flag(rows[i], FLAG_FREE_WINDOW)
+        elif rows[i]["is_round_trip"]:
+            _add_flag(rows[i], FLAG_DEFECT_IMMEDIATE)
+        else:
+            _add_flag(rows[i], FLAG_DEFECT_UNDERWAY)
+
+    # Wege durchnummerieren: eine neue Kette beginnt, wo die vorherige Miete
+    # nicht mit dieser verbunden war.
+    ketten: List[List[int]] = []
+    aktuell: List[int] = []
+    for pos, i in enumerate(reihenfolge):
+        aktuell.append(i)
+        vorheriger_verbindet = i in gehoert_zum_naechsten
+        if not vorheriger_verbindet or pos == len(reihenfolge) - 1:
+            ketten.append(aktuell)
+            aktuell = []
+
+    for kette in ketten:
+        erste = kette[0]
+        weg_id = (rows[erste]["start_date"] or "").replace("-", "").replace(":", "")
+        weg_id = weg_id.replace(" ", "-") or rows[erste]["ride_id"]
+        for nummer, i in enumerate(kette, start=1):
+            rows[i]["journey_id"] = weg_id
+            rows[i]["journey_leg"] = nummer
+            rows[i]["journey_legs"] = len(kette)
 
 
 def enrich_rides(
@@ -207,6 +252,9 @@ def enrich_rides(
         rows.append(
             {
                 "ride_id": ride.get("id", ""),
+                "journey_id": "",  # zweiter Durchgang, siehe _chain_journeys
+                "journey_leg": "",
+                "journey_legs": "",
                 "start_date": ride.get("startDate", ""),
                 "end_date": ride.get("endDate", ""),
                 "date": started.strftime("%Y-%m-%d") if started else "",
@@ -238,20 +286,25 @@ def enrich_rides(
             }
         )
 
-    _mark_aborted_rentals(rows, zeiten)
+    _chain_journeys(rows, zeiten)
 
     geocoded = sum(1 for r in rows if r["distance_km_luftlinie"] != "")
     flagged = [r for r in rows if r["quality_flag"]]
+
+    def _zaehle(flag: str) -> int:
+        return sum(1 for r in rows if flag in r["quality_flag"].split(";"))
+
     report = {
         "rides": len(rows),
+        "wege": len({r["journey_id"] for r in rows if r["journey_id"]}),
         "mit_koordinaten": geocoded,
         "ohne_koordinaten": len(rows) - geocoded,
         "unbekannte_startstationen": sorted(unmatched_start),
         "unbekannte_zielstationen": sorted(unmatched_end),
         "auffaellig": len(flagged),
-        "abgebrochene_mieten": sum(
-            1 for r in rows if "miete_abgebrochen" in r["quality_flag"]
-        ),
+        "defekt_sofort": _zaehle(FLAG_DEFECT_IMMEDIATE),
+        "defekt_unterwegs": _zaehle(FLAG_DEFECT_UNDERWAY),
+        "gratiszeit_zurueckgesetzt": _zaehle(FLAG_FREE_WINDOW),
         "auffaellige_fahrten": [
             f"{r['start_date'][:16]} {r['start_station']} -> {r['end_station']} "
             f"({r['duration_seconds']} s, {r['speed_kmh_luftlinie']} km/h) "

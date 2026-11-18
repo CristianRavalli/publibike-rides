@@ -120,65 +120,76 @@ class TestEnrich(unittest.TestCase):
         self.assertEqual(report["auffaellig"], 1)
 
 
-class TestAbgebrocheneMieten(unittest.TestCase):
-    """Velo genommen, taugte nichts, sofort zurueck und das naechste genommen."""
+class TestVorzeitigBeendeteMieten(unittest.TestCase):
+    """Eine Fahrt, die in zwei Mieten zerfiel — aus drei moeglichen Gruenden."""
 
     @staticmethod
-    def _paar(erste_start, erste_ende, zweite_start, **erste):
-        """Zwei aufeinanderfolgende Mieten; die erste ist der Kandidat."""
+    def _paar(erste_start, erste_ende, zweite_start, kam_vom_fleck=False):
+        """Zwei aufeinanderfolgende Mieten; die erste ist der Kandidat.
+
+        kam_vom_fleck=False heisst: Start- und Zielstation sind gleich, das
+        Velo lief also gar nicht erst.
+        """
+        if kam_vom_fleck:
+            ziel, ziel_id = "Hardplatz - Zürich", "1211"
+        else:
+            ziel, ziel_id = "Sihlpost - Zürich", "1148"
         a = ride(
             id="erste",
             startDate=erste_start,
             endDate=erste_ende,
-            endStation="Sihlpost - Zürich",
-            endStationId="1148",
-            **erste,
+            endStation=ziel,
+            endStationId=ziel_id,
         )
-        b = ride(id="zweite", startDate=zweite_start, endDate="2026-11-05 12:30:00")
+        b = ride(id="zweite", startDate=zweite_start, endDate="2026-11-05 13:30:00")
         return [a, b]
 
-    def _flag(self, rides_):
+    def _erste(self, rides_):
         rows, report = enrich_rides(rides_, STATIONS)
-        erste = next(r for r in rows if r["ride_id"] == "erste")
-        return erste["quality_flag"], report
+        return next(r for r in rows if r["ride_id"] == "erste"), report
 
-    def test_kurze_rundfahrt_mit_sofortiger_anschlussmiete(self):
-        flag, report = self._flag(
+    def test_velo_lief_gar_nicht_erst(self):
+        zeile, report = self._erste(
             self._paar("2026-11-05 12:00:00", "2026-11-05 12:00:35", "2026-11-05 12:00:48")
         )
-        self.assertIn("miete_abgebrochen", flag)
-        self.assertEqual(report["abgebrochene_mieten"], 1)
+        self.assertIn("defekt_sofort", zeile["quality_flag"])
+        self.assertEqual(report["defekt_sofort"], 1)
+
+    def test_velo_fiel_unterwegs_aus(self):
+        # Fuhr ein Stueck, dann sofort die naechste Miete: auch ein Defekt.
+        zeile, report = self._erste(
+            self._paar(
+                "2026-11-05 12:00:00", "2026-11-05 12:04:00", "2026-11-05 12:04:20",
+                kam_vom_fleck=True,
+            )
+        )
+        self.assertIn("defekt_unterwegs", zeile["quality_flag"])
+        self.assertEqual(report["defekt_unterwegs"], 1)
+
+    def test_lange_fahrt_ist_gratiszeit_statt_defekt(self):
+        # Ueber 20 Minuten: neue Miete, um die freien 30 Minuten nicht zu reissen.
+        zeile, report = self._erste(
+            self._paar(
+                "2026-11-05 12:00:00", "2026-11-05 12:25:00", "2026-11-05 12:25:30",
+                kam_vom_fleck=True,
+            )
+        )
+        self.assertIn("gratiszeit_zurueckgesetzt", zeile["quality_flag"])
+        self.assertEqual(report["defekt_unterwegs"], 0)
 
     def test_ueberlappung_zaehlt_auch(self):
-        # Die naechste Miete beginnt, bevor die vorherige verbucht ist.
-        flag, _ = self._flag(
+        # Das naechste Velo wurde genommen, bevor das vorherige verbucht war.
+        zeile, _ = self._erste(
             self._paar("2026-11-05 12:00:00", "2026-11-05 12:01:00", "2026-11-05 12:00:19")
         )
-        self.assertIn("miete_abgebrochen", flag)
+        self.assertIn("defekt_sofort", zeile["quality_flag"])
 
-    def test_anschlussmiete_ist_kein_abbruch(self):
-        # Das Velo kam vom Fleck — also kein Defekt, sondern Weiterfahrt.
-        rides_ = self._paar(
-            "2026-11-05 12:00:00", "2026-11-05 12:00:35", "2026-11-05 12:00:48"
-        )
-        rides_[0]["endStation"] = "Hardplatz - Zürich"
-        rides_[0]["endStationId"] = "1211"
-        flag, report = self._flag(rides_)
-        self.assertNotIn("miete_abgebrochen", flag)
-        self.assertEqual(report["abgebrochene_mieten"], 0)
-
-    def test_lange_rundfahrt_ist_kein_abbruch(self):
-        # 20 Minuten im Kreis sind eine Ausfahrt, kein defektes Velo.
-        flag, _ = self._flag(
-            self._paar("2026-11-05 12:00:00", "2026-11-05 12:20:00", "2026-11-05 12:20:30")
-        )
-        self.assertNotIn("miete_abgebrochen", flag)
-
-    def test_grosse_luecke_ist_kein_abbruch(self):
-        flag, _ = self._flag(
+    def test_grosse_luecke_ist_nichts_davon(self):
+        zeile, report = self._erste(
             self._paar("2026-11-05 12:00:00", "2026-11-05 12:00:35", "2026-11-05 12:30:00")
         )
-        self.assertNotIn("miete_abgebrochen", flag)
+        self.assertEqual(zeile["quality_flag"], "")
+        self.assertEqual(report["defekt_sofort"], 0)
 
     def test_luecke_wird_eingetragen(self):
         rows, _ = enrich_rides(
@@ -189,6 +200,68 @@ class TestAbgebrocheneMieten(unittest.TestCase):
         letzte = next(r for r in rows if r["ride_id"] == "zweite")
         self.assertEqual(erste["gap_to_next_min"], 2.0)
         self.assertEqual(letzte["gap_to_next_min"], "")  # nichts folgt mehr
+
+
+class TestWegeVerketten(unittest.TestCase):
+    """Zusammenhaengende Mieten gehoeren zu einem Weg."""
+
+    @staticmethod
+    def _kette(*zeiten):
+        """Mieten aus (start, ende)-Paaren, alle mit wechselnden Stationen."""
+        return [
+            ride(id=f"m{n}", startDate=start, endDate=ende)
+            for n, (start, ende) in enumerate(zeiten, start=1)
+        ]
+
+    def test_zwei_mieten_ein_weg(self):
+        rows, report = enrich_rides(
+            self._kette(
+                ("2026-11-05 12:00:00", "2026-11-05 12:04:00"),
+                ("2026-11-05 12:04:20", "2026-11-05 12:10:00"),
+            ),
+            STATIONS,
+        )
+        self.assertEqual(report["wege"], 1)
+        self.assertEqual({r["journey_id"] for r in rows}, {"20261105-120000"})
+        self.assertEqual([r["journey_leg"] for r in rows], [1, 2])
+        self.assertTrue(all(r["journey_legs"] == 2 for r in rows))
+
+    def test_grosse_luecke_trennt_die_wege(self):
+        rows, report = enrich_rides(
+            self._kette(
+                ("2026-11-05 12:00:00", "2026-11-05 12:04:00"),
+                ("2026-11-05 14:00:00", "2026-11-05 14:10:00"),
+            ),
+            STATIONS,
+        )
+        self.assertEqual(report["wege"], 2)
+        self.assertEqual(len({r["journey_id"] for r in rows}), 2)
+        self.assertTrue(all(r["journey_legs"] == 1 for r in rows))
+
+    def test_drei_mieten_eine_kette(self):
+        rows, report = enrich_rides(
+            self._kette(
+                ("2026-11-05 12:00:00", "2026-11-05 12:02:00"),
+                ("2026-11-05 12:02:30", "2026-11-05 12:05:00"),
+                ("2026-11-05 12:05:30", "2026-11-05 12:20:00"),
+            ),
+            STATIONS,
+        )
+        self.assertEqual(report["wege"], 1)
+        self.assertEqual(sorted(r["journey_leg"] for r in rows), [1, 2, 3])
+        self.assertTrue(all(r["journey_legs"] == 3 for r in rows))
+
+    def test_letzte_miete_einer_kette_traegt_kein_flag(self):
+        # Nur die vorzeitig beendeten Mieten werden markiert, nicht der Rest.
+        rows, _ = enrich_rides(
+            self._kette(
+                ("2026-11-05 12:00:00", "2026-11-05 12:02:00"),
+                ("2026-11-05 12:02:30", "2026-11-05 12:20:00"),
+            ),
+            STATIONS,
+        )
+        letzte = next(r for r in rows if r["journey_leg"] == 2)
+        self.assertEqual(letzte["quality_flag"], "")
 
     def test_unbekannte_station_bleibt_leer_statt_geraten(self):
         rows, report = enrich_rides(

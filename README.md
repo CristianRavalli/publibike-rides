@@ -133,20 +133,30 @@ einer anderen Station endet als sie begann, ist keine Fahrt, sondern ein
 Buchungsartefakt. Solche Zeilen bekommen `quality_flag = tempo_unplausibel`
 (Schwelle: 40 km/h Luftlinie) und sollten aus Tempo-Auswertungen fliegen.
 
-**Abgebrochene Mieten sind erkennbar.** Velo genommen, es taugte nichts, sofort
-zurückgestellt und das nächste genommen — das steht als zwei Fahrten in den
-Daten, obwohl es eine Fahrt war. Markiert wird mit `miete_abgebrochen`, wenn
-alle drei Bedingungen zusammenkommen: die Miete endet an ihrer Startstation,
-sie dauerte höchstens drei Minuten, und die nächste Miete beginnt innerhalb
-von drei Minuten (auch überlappend).
+**Eine Fahrt zerfällt oft in zwei Mieten.** Beginnt eine Miete innerhalb von
+drei Minuten nach der vorherigen — auch überlappend —, war es in Wahrheit ein
+Weg. Dafür gibt es drei Gründe, und die Daten erlauben, sie auseinanderzuhalten:
 
-Entscheidend ist dabei die erste Bedingung. Eine kurze Lücke allein genügt
-nicht: Wer irgendwo andockt und sofort weiterfährt, hat eine Anschlussmiete,
-kein defektes Velo. Im Testdatensatz trennte dieses Kriterium 11 Abbrüche
-sauber von 33 Anschlussmieten — und die Zeitschwelle erwies sich als
-unempfindlich, weil zwischen 60 und 234 Sekunden überhaupt keine Lücke vorkam.
+| Markierung | Was passiert ist | Erkennungsmerkmal |
+|---|---|---|
+| `defekt_sofort` | Das Velo lief gar nicht erst. | Die Miete endet an ihrer Startstation. |
+| `defekt_unterwegs` | Das Velo fiel nach kurzer Fahrt aus; man stellt es ab, wo man ist, und nimmt das nächste, um ans Ziel zu kommen. | Die Miete ging woanders hin und dauerte höchstens 20 Minuten. |
+| `gratiszeit_zurueckgesetzt` | Kein Defekt: Neue Miete, damit die freien 30 Minuten nicht reissen. | Die Miete dauerte länger als 20 Minuten. |
 
-Die Spalte `gap_to_next_min` steht in jeder Zeile und macht das nachprüfbar.
+Beide Schwellen sind in den Testdaten unempfindlich, was für die Regel
+spricht. Zwischen 60 und 234 Sekunden kommt keine einzige Lücke vor, also
+liefern 1, 2 und 3 Minuten dasselbe. Und die Fahrzeiten springen von 896
+Sekunden direkt auf 1565, also liefert jede Grenze zwischen 15 und 26 Minuten
+dasselbe. Von 258 Mieten entfielen 11 auf `defekt_sofort`, 32 auf
+`defekt_unterwegs` und eine auf `gratiszeit_zurueckgesetzt`.
+
+**Die Zähleinheit ist der Weg, nicht die Miete.** Zusammenhängende Mieten
+bekommen dieselbe `journey_id`, dazu `journey_leg` und `journey_legs`. Aus 258
+Mieten wurden so 214 Wege; die längste Kette umfasst vier Mieten. Wer «wie oft
+bin ich gefahren» beantworten will, zählt Wege — wer wissen will, wie oft ein
+Velo ausfiel, zählt Mieten.
+
+Die Spalte `gap_to_next_min` steht in jeder Zeile und macht beides nachprüfbar.
 
 **Rundfahrten haben Distanz 0.** Start gleich Ziel heisst nicht, dass nichts
 gefahren wurde — die Strecke dazwischen ist nur nicht rekonstruierbar. Die
