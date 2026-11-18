@@ -121,11 +121,32 @@ Zielstation. `distance_km_luftlinie` ist die gerade Verbindung zwischen beiden
 Punkten — die gefahrene Strecke ist länger. Alle darauf aufbauenden Spalten
 heissen deshalb ausdrücklich `luftlinie`.
 
-**Die Dauer ist auf Minuten gerundet.** Eine Fahrt von 18 Sekunden steht als
-`1` in den Daten. Endet sie an einer anderen Station, ergibt die
-Geschwindigkeitsrechnung Unsinn. Solche Zeilen bekommen in `rides_geo.csv` die
-Markierung `quality_flag = tempo_unplausibel` (Schwelle: 40 km/h Luftlinie) und
-sollten aus Tempo-Auswertungen fliegen.
+**Die Dauer der API ist aufgerundet.** `durationInMinute` ist immer die auf
+ganze Minuten aufgerundete Fahrzeit — in einem Testdatensatz mit 258 Fahrten
+lag die Abweichung zur Zeitstempel-Rechnung in jedem einzelnen Fall bei exakt
+0 oder 1 Minute, nie mehr. Eine Fahrt von 19 Sekunden steht dort als `1`.
+Gerechnet wird deshalb mit `duration_seconds` aus `endDate` minus `startDate`;
+das API-Feld bleibt als `duration_min` daneben stehen.
+
+**Manche Fahrten sind physisch unmöglich.** Eine Miete über 16 Sekunden, die an
+einer anderen Station endet als sie begann, ist keine Fahrt, sondern ein
+Buchungsartefakt. Solche Zeilen bekommen `quality_flag = tempo_unplausibel`
+(Schwelle: 40 km/h Luftlinie) und sollten aus Tempo-Auswertungen fliegen.
+
+**Abgebrochene Mieten sind erkennbar.** Velo genommen, es taugte nichts, sofort
+zurückgestellt und das nächste genommen — das steht als zwei Fahrten in den
+Daten, obwohl es eine Fahrt war. Markiert wird mit `miete_abgebrochen`, wenn
+alle drei Bedingungen zusammenkommen: die Miete endet an ihrer Startstation,
+sie dauerte höchstens drei Minuten, und die nächste Miete beginnt innerhalb
+von drei Minuten (auch überlappend).
+
+Entscheidend ist dabei die erste Bedingung. Eine kurze Lücke allein genügt
+nicht: Wer irgendwo andockt und sofort weiterfährt, hat eine Anschlussmiete,
+kein defektes Velo. Im Testdatensatz trennte dieses Kriterium 11 Abbrüche
+sauber von 33 Anschlussmieten — und die Zeitschwelle erwies sich als
+unempfindlich, weil zwischen 60 und 234 Sekunden überhaupt keine Lücke vorkam.
+
+Die Spalte `gap_to_next_min` steht in jeder Zeile und macht das nachprüfbar.
 
 **Rundfahrten haben Distanz 0.** Start gleich Ziel heisst nicht, dass nichts
 gefahren wurde — die Strecke dazwischen ist nur nicht rekonstruierbar. Die

@@ -105,11 +105,90 @@ class TestEnrich(unittest.TestCase):
         self.assertEqual(row["weekday"], "Donnerstag")
         self.assertEqual(row["hour"], 12)
 
+    def test_dauer_kommt_aus_den_zeitstempeln(self):
+        # Die API rundet auf ganze Minuten auf; gerechnet wird mit Sekunden.
+        rows, _ = enrich_rides([ride(durationInMinute=99)], STATIONS)
+        self.assertEqual(rows[0]["duration_seconds"], 415)
+        self.assertEqual(rows[0]["duration_min"], 99)  # unveraendert mitgefuehrt
+
     def test_unplausibles_tempo_wird_markiert(self):
-        # 1.6 km in einer Minute waeren knapp 100 km/h.
-        rows, report = enrich_rides([ride(durationInMinute=1)], STATIONS)
-        self.assertEqual(rows[0]["quality_flag"], "tempo_unplausibel")
+        # 1.6 km in 16 Sekunden sind offensichtlich keine gefahrene Strecke.
+        rows, report = enrich_rides(
+            [ride(endDate="2026-11-05 12:59:14", durationInMinute=1)], STATIONS
+        )
+        self.assertIn("tempo_unplausibel", rows[0]["quality_flag"])
         self.assertEqual(report["auffaellig"], 1)
+
+
+class TestAbgebrocheneMieten(unittest.TestCase):
+    """Velo genommen, taugte nichts, sofort zurueck und das naechste genommen."""
+
+    @staticmethod
+    def _paar(erste_start, erste_ende, zweite_start, **erste):
+        """Zwei aufeinanderfolgende Mieten; die erste ist der Kandidat."""
+        a = ride(
+            id="erste",
+            startDate=erste_start,
+            endDate=erste_ende,
+            endStation="Sihlpost - Zürich",
+            endStationId="1148",
+            **erste,
+        )
+        b = ride(id="zweite", startDate=zweite_start, endDate="2026-11-05 12:30:00")
+        return [a, b]
+
+    def _flag(self, rides_):
+        rows, report = enrich_rides(rides_, STATIONS)
+        erste = next(r for r in rows if r["ride_id"] == "erste")
+        return erste["quality_flag"], report
+
+    def test_kurze_rundfahrt_mit_sofortiger_anschlussmiete(self):
+        flag, report = self._flag(
+            self._paar("2026-11-05 12:00:00", "2026-11-05 12:00:35", "2026-11-05 12:00:48")
+        )
+        self.assertIn("miete_abgebrochen", flag)
+        self.assertEqual(report["abgebrochene_mieten"], 1)
+
+    def test_ueberlappung_zaehlt_auch(self):
+        # Die naechste Miete beginnt, bevor die vorherige verbucht ist.
+        flag, _ = self._flag(
+            self._paar("2026-11-05 12:00:00", "2026-11-05 12:01:00", "2026-11-05 12:00:19")
+        )
+        self.assertIn("miete_abgebrochen", flag)
+
+    def test_anschlussmiete_ist_kein_abbruch(self):
+        # Das Velo kam vom Fleck — also kein Defekt, sondern Weiterfahrt.
+        rides_ = self._paar(
+            "2026-11-05 12:00:00", "2026-11-05 12:00:35", "2026-11-05 12:00:48"
+        )
+        rides_[0]["endStation"] = "Hardplatz - Zürich"
+        rides_[0]["endStationId"] = "1211"
+        flag, report = self._flag(rides_)
+        self.assertNotIn("miete_abgebrochen", flag)
+        self.assertEqual(report["abgebrochene_mieten"], 0)
+
+    def test_lange_rundfahrt_ist_kein_abbruch(self):
+        # 20 Minuten im Kreis sind eine Ausfahrt, kein defektes Velo.
+        flag, _ = self._flag(
+            self._paar("2026-11-05 12:00:00", "2026-11-05 12:20:00", "2026-11-05 12:20:30")
+        )
+        self.assertNotIn("miete_abgebrochen", flag)
+
+    def test_grosse_luecke_ist_kein_abbruch(self):
+        flag, _ = self._flag(
+            self._paar("2026-11-05 12:00:00", "2026-11-05 12:00:35", "2026-11-05 12:30:00")
+        )
+        self.assertNotIn("miete_abgebrochen", flag)
+
+    def test_luecke_wird_eingetragen(self):
+        rows, _ = enrich_rides(
+            self._paar("2026-11-05 12:00:00", "2026-11-05 12:00:35", "2026-11-05 12:02:35"),
+            STATIONS,
+        )
+        erste = next(r for r in rows if r["ride_id"] == "erste")
+        letzte = next(r for r in rows if r["ride_id"] == "zweite")
+        self.assertEqual(erste["gap_to_next_min"], 2.0)
+        self.assertEqual(letzte["gap_to_next_min"], "")  # nichts folgt mehr
 
     def test_unbekannte_station_bleibt_leer_statt_geraten(self):
         rows, report = enrich_rides(
