@@ -1,0 +1,13 @@
+station_id,station_number,name,lat,lon,address,post_code,capacity
+PIB:Station:1106,1106,Airgate - Leutschenbach - Zürich,47.41453,8.552773,Thurgauerstrasse 40,8050,30
+PIB:Station:1214,1214,Bad Allenmoos - Zürich,47.405754,8.539021,Ringstrasse 82,8057,30
+PIB:Station:1238,1238,Bahnhof Oerlikon - Zürich,47.41106,8.543765,Hofwiesenstrasse 369,8050,50
+PIB:Station:1225,1225,Berninaplatz - Zürich,47.40382,8.546459,Berninastrasse 41,8057,30
+PIB:Station:1946,1946,Gubelstrasse - Zürich,47.408306,8.544361,Schulstrasse 3,8050,50
+PIB:Station:1263,1263,Kirche Unterstrass - Zürich,47.38728,8.542349,Turnerstrasse 45,8006,30
+PIB:Station:2025,2025,Letzistrasse - Zürich,47.391113,8.545758,Letzistrasse 6a,8006,50
+PIB:Station:1287,1287,Marktplatz - Zürich,47.40996,8.5453,Querstrasse 8,8050,30
+PIB:Station:1259,1259,Messe/Hallenstadion - Zürich,47.410664,8.551919,Wallisellenstrasse 45,8050,30
+PIB:Station:1249,1249,Oerliker Park - Zürich,47.415718,8.538073,Birchstrasse 191,8050,30
+PIB:Station:1200,1200,Schwamendingerplatz - Zürich,47.404816,8.572665,Herzogenmühlestrasse 5,8051,30
+PIB:Station:1187,1187,Wahlenpark - Zürich,47.416176,8.541786,Margrit-Rainer-Strasse 5,8050,30

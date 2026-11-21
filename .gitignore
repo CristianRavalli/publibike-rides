@@ -2,6 +2,8 @@
 # auch nicht in ein privates.
 data/*
 !data/.gitkeep
+# Der synthetische Beispieldatensatz gehoert dagegen ins Repo.
+!data/beispiel/
 .credentials.json
 .env
 

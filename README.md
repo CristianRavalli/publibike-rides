@@ -7,6 +7,83 @@ Die App zeigt die Fahrten nur einzeln und bietet keinen Export. Dieses Projekt
 holt sie über dieselbe Schnittstelle, die die App selbst benutzt, und macht
 Zahlen und Karten daraus.
 
+![Stationsnetz](docs/karte.png)
+
+---
+
+## Worum es geht
+
+**Fragestellung.** Wie bewege ich mich mit dem Veloverleih durch die Stadt —
+welche Achsen, zu welchen Zeiten, und wie zuverlässig ist das System dabei?
+Die letzte Teilfrage war beim Start nicht geplant; sie ergab sich aus den
+Daten.
+
+**Datenquelle.** Zwei Quellen, beide live abgerufen:
+
+- die eigene Fahrtenhistorie aus dem Backend von PubliBike/Velospot, nach
+  Anmeldung mit Telefonnummer und SMS-Code
+- die Stationskoordinaten aus dem offenen GBFS-Feed für Velospot (CC-BY-4.0)
+
+**Vorgehen.**
+
+```mermaid
+flowchart LR
+    A[PubliBike-API<br/>eigene Fahrten] --> C[enrich]
+    B[GBFS-Feed<br/>Stationen + Koordinaten] --> C
+    C --> D[rides_geo.csv<br/>Mieten + Wege + Qualitätsmarken]
+    D --> E[Notebook<br/>Kennzahlen und Karten]
+```
+
+Die Fahrten werden seitenweise abgerufen und über die Fahrt-ID dedupliziert,
+mit den Stationen verbunden — die Zielstation über ihre ID, die Startstation
+über den Namen —, um abgeleitete Kennzahlen ergänzt und auf Plausibilität
+geprüft.
+
+**Ergebnis.** Zwei Dinge, die in der App nicht sichtbar sind.
+
+Erstens das Bewegungsmuster: eine dominante Pendelachse, ein klarer
+Wochenrhythmus mit einem schwachen Tag, Spitzen am Morgen und am späten
+Nachmittag.
+
+![Muster nach Monat, Wochentag und Tagesstunde](docs/muster.png)
+
+Zweitens — und das war die Überraschung — dass sich **defekte Velos in den
+Daten nachweisen lassen**, obwohl die API kein solches Feld kennt. Wer ein
+Velo nimmt, das nicht läuft, und sofort das nächste nimmt, hinterlässt zwei
+Mieten dicht hintereinander. Ob die erste an ihrer Startstation endete, sagt,
+ob der Defekt sofort oder erst unterwegs auffiel. Und ob sie länger als 20
+Minuten dauerte, trennt den Defekt vom bewussten Zurücksetzen der Gratiszeit.
+
+Beide Schwellen liegen in einer Lücke der Verteilung, nicht im Gedränge — sie
+lassen sich verschieben, ohne dass sich das Ergebnis ändert. Das ist der
+Grund, warum die Regel trägt:
+
+![Beide Schwellen liegen in einer Lücke der Verteilung](docs/qualitaet.png)
+
+Die Bilder stammen aus dem synthetischen Beispieldatensatz, nicht aus echten
+Fahrten — siehe unten.
+
+---
+
+## Zum Ausprobieren ohne eigenes Konto
+
+Im Repository liegt unter `data/beispiel/` ein **erfundener** Datensatz: 372
+Mieten über acht Monate. Die Stationen und ihre Koordinaten sind echt, die
+Fahrten nicht. Das Notebook greift automatisch darauf zurück, wenn keine
+eigenen Daten da sind, und sagt in der ersten Zelle, welche Quelle es benutzt.
+
+```bash
+python3 -m venv .venv && source .venv/bin/activate
+pip install -r requirements.txt
+jupyter notebook notebooks/01_analyse.ipynb
+```
+
+Neu erzeugen lässt er sich mit `python3 scripts/beispieldaten.py`, die Bilder
+mit `python3 scripts/bilder.py`. Der Zufallsstartwert ist fest, der Lauf also
+reproduzierbar. Eingebaut sind bewusst alle Muster, die die Pipeline erkennen
+soll — wer die Regeln prüfen will, hat damit einen Datensatz, bei dem die
+richtige Antwort bekannt ist.
+
 ---
 
 ## Schnellstart
@@ -27,15 +104,25 @@ Beide Eingaben laufen **ohne Echo** — du siehst beim Tippen nichts. Das ist
 Absicht: sonst stehen Telefonnummer und Code im Verlauf des Terminals und
 landen in Screenshots, Logs oder geteilten Sitzungen.
 
-| Datei | Inhalt |
-|---|---|
-| `data/rides.csv` | deine Fahrten, so wie die API sie liefert |
-| `data/rides_raw.json` | dasselbe als JSON, mit allen Feldern |
-| `data/stations.csv` | alle Stationen mit Koordinaten |
-| `data/rides_geo.csv` | Fahrten + Koordinaten + abgeleitete Kennzahlen |
+| Datei | Eine Zeile ist | Schlüssel |
+|---|---|---|
+| `data/rides.csv` | eine Miete, wie die API sie liefert | `id` |
+| `data/rides_raw.json` | dasselbe als JSON, mit allen Feldern | `id` |
+| `data/stations.csv` | eine Station mit Koordinaten | `station_id` |
+| `data/rides_geo.csv` | eine Miete, angereichert und geprüft | `ride_id`, dazu `journey_id` für den Weg |
 
 Für die Analyse reicht `data/rides_geo.csv` — die Datei lässt sich auch direkt
 in Excel, Power BI oder R öffnen.
+
+Achtung bei der Zähleinheit: Eine Zeile ist eine **Miete**, nicht eine Fahrt.
+Mehrere Mieten können zu einem **Weg** gehören, erkennbar an derselben
+`journey_id`. Warum, steht unter [Zur Datenqualität](#zur-datenqualität).
+
+**Laufrhythmus und Nachholen.** Es gibt keinen Zeitplan; der Abruf läuft, wenn
+du ihn startest. Jeder Lauf holt die vollständige Historie neu und schreibt
+die Dateien neu — zweimal ausgeführt entsteht zweimal dasselbe Ergebnis. Ein
+verpasster Lauf muss deshalb nicht nachgeholt werden, und ein Backfill-Konzept
+braucht es nicht.
 
 ### Einzelne Schritte
 
