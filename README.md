@@ -67,12 +67,14 @@ Fahrten — siehe unten.
 
 ## Zum Ausprobieren ohne eigenes Konto
 
-Im Repository liegt unter `data/beispiel/` ein **erfundener** Datensatz: 372
+Im Repository liegt unter `data/beispiel/` ein **erfundener** Datensatz: 402
 Mieten über acht Monate. Die Stationen und ihre Koordinaten sind echt, die
 Fahrten nicht. Das Notebook greift automatisch darauf zurück, wenn keine
 eigenen Daten da sind, und sagt in der ersten Zelle, welche Quelle es benutzt.
 
 ```bash
+git clone https://github.com/CristianRavalli/publibike-rides.git
+cd publibike-rides
 python3 -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
 jupyter notebook notebooks/01_analyse.ipynb
@@ -86,23 +88,22 @@ richtige Antwort bekannt ist.
 
 ---
 
-## Schnellstart
+## Eigene Fahrten herunterladen
 
-Du brauchst Python 3.9 oder neuer — mehr nicht. Der Download kommt ohne
-zusätzliche Pakete aus.
+Du brauchst Python 3.9 oder neuer, sonst nichts: Der Download nutzt
+ausschliesslich die Standardbibliothek. Die Pakete aus `requirements.txt`
+braucht erst die Analyse.
 
 ```bash
-git clone https://github.com/CristianRavalli/publibike-rides.git
-cd publibike-rides
 python3 -m publibike_rides
 ```
 
-Das war es. Der Befehl fragt nach deiner Telefonnummer, schickt dir eine SMS,
-fragt den Code ab und legt danach an:
+Der Befehl fragt nach deiner Telefonnummer, schickt dir eine SMS und fragt den
+Code ab. Beide Eingaben laufen **ohne Echo** — du siehst beim Tippen nichts.
+Das ist Absicht: sonst stehen Telefonnummer und Code im Verlauf des Terminals
+und landen in Screenshots, Logs oder geteilten Sitzungen.
 
-Beide Eingaben laufen **ohne Echo** — du siehst beim Tippen nichts. Das ist
-Absicht: sonst stehen Telefonnummer und Code im Verlauf des Terminals und
-landen in Screenshots, Logs oder geteilten Sitzungen.
+Danach liegen vier Dateien bereit:
 
 | Datei | Eine Zeile ist | Schlüssel |
 |---|---|---|
@@ -136,28 +137,24 @@ python3 -m publibike_rides enrich     # beides verbinden
 Der Token wird in `.credentials.json` abgelegt (nur für dich lesbar) und gilt,
 bis die App ihn verfallen lässt. Danach einfach `login` wiederholen.
 
+Sobald `data/rides_geo.csv` da ist, nimmt das Notebook deine Fahrten statt des
+Beispieldatensatzes — derselbe Aufruf wie oben, kein Umschalten nötig.
+
 ---
 
-## Analyse und Karte
+## Was im Notebook steht
 
-```bash
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-jupyter notebook notebooks/01_analyse.ipynb
-```
-
-Das Notebook enthält:
-
-- Überblick: Fahrten, Stunden, aktive Tage, genutzte Stationen
-- Datenqualität: welche Fahrten unplausibel sind und warum
+- Überblick: Mieten, Wege, Stunden, aktive Tage, genutzte Stationen
+- Datenqualität zuerst: welche Mieten markiert sind und warum
+- die Gegenprobe, dass beide Schwellen der Regel in einer Lücke liegen
 - Muster nach Monat, Wochentag und Tagesstunde
 - Verteilung der Fahrtdauer, E-Bike gegen Velo
 - die meistgenutzten Stationen und Strecken
+- Mieten gegen Wege: wie oft aus zwei Mieten eine Fahrt wird
 - eine Karte mit Stationen (Grösse nach Nutzung) und Verbindungslinien
 - eine Wärmekarte
 
-Die Karten landen als HTML in `maps/`.
+Die Karten landen als HTML in `maps/`, die Bilder fürs README in `docs/`.
 
 ---
 
@@ -190,8 +187,8 @@ https://api.mobidata-bw.de/sharing/gbfs/v3/velospot_ch/station_information
 
 Der Join läuft zweigleisig: die Zielstation über die ID (`endStationId` 1148
 entspricht `PIB:Station:1148`), die Startstation über den Namen, weil die
-Historie dafür keine ID liefert. Bei einem Testdatensatz mit 258 Fahrten über
-56 verschiedene Stationen wurden alle zugeordnet.
+Historie dafür keine ID liefert. Über meine eigenen 258 Fahrten an 56
+verschiedenen Stationen wurden alle zugeordnet.
 
 Der eigene GBFS-Feed von PubliBike (`api.publibike.ch/v1/gbfs/...`) antwortet
 Stand November 2026 mit einer leeren Stationsliste — vermutlich wegen der
@@ -201,7 +198,10 @@ Migration auf das neue Backend. Deshalb der Umweg.
 
 ## Zur Datenqualität
 
-Ein paar Dinge, die beim Auswerten wichtig sind:
+Ein paar Dinge, die beim Auswerten wichtig sind. Die Zahlen in diesem
+Abschnitt stammen aus **meinen eigenen 258 Fahrten**, nicht aus dem
+Beispieldatensatz — sie sind der Grund, warum die Regeln so aussehen, wie sie
+aussehen.
 
 **Die Distanz ist Luftlinie.** Die API liefert keine GPS-Spur, nur Start- und
 Zielstation. `distance_km_luftlinie` ist die gerade Verbindung zwischen beiden
@@ -209,9 +209,9 @@ Punkten — die gefahrene Strecke ist länger. Alle darauf aufbauenden Spalten
 heissen deshalb ausdrücklich `luftlinie`.
 
 **Die Dauer der API ist aufgerundet.** `durationInMinute` ist immer die auf
-ganze Minuten aufgerundete Fahrzeit — in einem Testdatensatz mit 258 Fahrten
-lag die Abweichung zur Zeitstempel-Rechnung in jedem einzelnen Fall bei exakt
-0 oder 1 Minute, nie mehr. Eine Fahrt von 19 Sekunden steht dort als `1`.
+ganze Minuten aufgerundete Fahrzeit — über alle 258 Fahrten lag die Abweichung
+zur Zeitstempel-Rechnung in jedem einzelnen Fall bei exakt 0 oder 1 Minute,
+nie mehr. Eine Fahrt von 19 Sekunden steht dort als `1`.
 Gerechnet wird deshalb mit `duration_seconds` aus `endDate` minus `startDate`;
 das API-Feld bleibt als `duration_min` daneben stehen.
 
@@ -230,9 +230,9 @@ Weg. Dafür gibt es drei Gründe, und die Daten erlauben, sie auseinanderzuhalte
 | `defekt_unterwegs` | Das Velo fiel nach kurzer Fahrt aus; man stellt es ab, wo man ist, und nimmt das nächste, um ans Ziel zu kommen. | Die Miete ging woanders hin und dauerte höchstens 20 Minuten. |
 | `gratiszeit_zurueckgesetzt` | Kein Defekt: Neue Miete, damit die freien 30 Minuten nicht reissen. | Die Miete dauerte länger als 20 Minuten. |
 
-Beide Schwellen sind in den Testdaten unempfindlich, was für die Regel
-spricht. Zwischen 60 und 234 Sekunden kommt keine einzige Lücke vor, also
-liefern 1, 2 und 3 Minuten dasselbe. Und die Fahrzeiten springen von 896
+Beide Schwellen sind unempfindlich, und das spricht für die Regel. Zwischen 60
+und 234 Sekunden kommt keine einzige Lücke vor, also liefern 1, 2 und 3
+Minuten dasselbe. Und die Fahrzeiten springen von 896
 Sekunden direkt auf 1565, also liefert jede Grenze zwischen 15 und 26 Minuten
 dasselbe. Von 258 Mieten entfielen 11 auf `defekt_sofort`, 32 auf
 `defekt_unterwegs` und eine auf `gratiszeit_zurueckgesetzt`.
@@ -255,13 +255,34 @@ werden, lässt sich von aussen nicht feststellen.
 
 ---
 
+## Tests
+
+```bash
+python3 -m unittest discover tests
+```
+
+23 Tests, ohne Netz und ohne Zugangsdaten. Geprüft werden die Distanzrechnung,
+der Join über ID und Name, die Abgrenzung der drei Gründe für eine vorzeitig
+beendete Miete und die Verkettung zu Wegen. Der Schwerpunkt liegt auf den
+Fällen, die *nicht* markiert werden sollen — eine lange Rundfahrt, eine grosse
+Lücke, eine Fahrt über 20 Minuten. Eine Regel, die zu viel einsammelt, fällt
+sonst nicht auf.
+
+---
+
 ## Was nicht ins Repository gehört
 
 `.gitignore` hält Folgendes draussen, und das ist Absicht:
 
 - `data/` — deine Fahrten sind Bewegungsdaten. Wo du wann warst, über Monate.
+  Ausgenommen ist `data/beispiel/`: erfundene Fahrten, die niemandem gehören.
 - `.credentials.json` — dein Zugangstoken.
 - `maps/` und ausgeführte Notebooks — sie enthalten dieselben Daten noch einmal.
+
+Auch der Beispieldatensatz hält sich daran: Keine seiner zwölf Stationen kommt
+in meinen tatsächlichen Fahrten vor. Ein Beispiel, das die eigene Pendelachse
+nachzeichnet, gäbe genau das preis, was hier geschützt werden soll — auch wenn
+«erfunden» darüber steht.
 
 Das Notebook wird **ohne Ausgaben** eingecheckt. Wenn du es ausgeführt hast und
 committen willst, vorher leeren:
@@ -291,12 +312,19 @@ Die Stationsdaten stammen aus einem offenen Feed unter CC-BY-4.0.
 
 ```
 publibike_rides/
-  api.py         Login und Fahrtenabruf (nur Standardbibliothek)
-  stations.py    GBFS-Feed holen und normalisieren
-  enrich.py      Join und abgeleitete Kennzahlen
-  cli.py         Kommandozeile
+  api.py              Login und Fahrtenabruf (nur Standardbibliothek)
+  stations.py         GBFS-Feed holen und normalisieren
+  enrich.py           Join, Wege, abgeleitete Kennzahlen, Qualitätsmarken
+  cli.py              Kommandozeile
+scripts/
+  beispieldaten.py    erfundenen Datensatz erzeugen
+  bilder.py           Karte und Grafiken fürs README rendern
 notebooks/
-  01_analyse.ipynb
-data/            wird erzeugt, nicht eingecheckt
-maps/            wird erzeugt, nicht eingecheckt
+  01_analyse.ipynb    Kennzahlen, Gegenproben, Karten
+tests/
+  test_pipeline.py    23 Tests für Distanz, Join, Regeln, Verkettung
+docs/                 die Bilder aus diesem README
+data/beispiel/        erfundener Datensatz, eingecheckt
+data/                 eigene Fahrten, wird erzeugt und nicht eingecheckt
+maps/                 Karten aus dem Notebook, wird erzeugt
 ```
