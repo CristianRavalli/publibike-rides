@@ -99,7 +99,14 @@
       }
       .diagramme { display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); }
       .diagramm h3 { margin: 0 0 10px; font-size: 0.92rem; font-weight: 600; color: var(--gedaempft); }
-      svg { display: block; width: 100%; height: auto; overflow: visible; }
+
+      /*
+        Nur die Diagramme, nicht jedes SVG der Seite. Als blosses "svg { ... }"
+        traf diese Regel auch die Zeichenebene von Leaflet und drückte sie auf
+        0 x 0 zusammen: Die Karte zeigte dann Kacheln, aber keine Stationen,
+        obwohl die Kreise im DOM korrekt berechnet waren.
+      */
+      .diagramm svg { display: block; width: 100%; height: auto; overflow: visible; }
 
       table { width: 100%; border-collapse: collapse; font-size: 0.93rem; }
       th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--rand); }
@@ -181,6 +188,6 @@
       weiter den alten Python-Code aus, während die Seite schon neu ist.
       Bei jeder Änderung an dashboard.py hochzählen.
     -->
-    <script type="py" src="./dashboard.py?v=4"></script>
+    <script type="py" src="./dashboard.py?v=5"></script>
   </body>
 </html>
