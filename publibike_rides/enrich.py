@@ -67,18 +67,24 @@ MAX_PLAUSIBLE_SPEED_KMH = 40.0
 # bevor das vorherige verbucht war.
 MAX_GAP_TO_NEXT_SECONDS = 180
 
-# Ab dieser Fahrzeit ist eine sofortige Neumiete kein Defekt, sondern das
-# Zurücksetzen der Gratiszeit vor Ablauf der freien 30 Minuten.
+# Oberhalb dieser Fahrzeit wird eine sofortige Neumiete nicht mehr als Defekt
+# gewertet. Die Miete lief dann lange genug, dass ein Ausfall nicht die
+# naheliegendste Erklärung ist.
 #
-# Die Grenze ist unempfindlich: in einem Testdatensatz mit 258 Fahrten
-# springen die Dauern von 896 Sekunden direkt auf 1565, dazwischen liegt
-# nichts. Jeder Wert zwischen 15 und 26 Minuten liefert dasselbe Ergebnis.
+# Die Grenze ist unempfindlich: über 258 eigene Fahrten springen die Dauern
+# von 896 Sekunden direkt auf 1565, dazwischen liegt nichts. Jeder Wert
+# zwischen 15 und 26 Minuten liefert dasselbe Ergebnis. Allerdings beruht
+# diese Lücke auf einem einzigen Datenpunkt oberhalb der Grenze — die
+# Markierung sagt deshalb, was beobachtet wurde, und nicht, warum.
 FREE_WINDOW_RESET_SECONDS = 1200
 
-# Warum eine Miete vorzeitig endete.
+# Was an einer vorzeitig beendeten Miete beobachtet wurde. Die ersten beiden
+# Namen benennen eine Ursache, weil sie sich aus den Daten ergibt: Ein Velo,
+# das an seiner Startstation abgestellt und sofort durch ein anderes ersetzt
+# wird, war defekt. Der dritte benennt bewusst keine — siehe oben.
 FLAG_DEFECT_IMMEDIATE = "defekt_sofort"      # Velo lief gar nicht erst
 FLAG_DEFECT_UNDERWAY = "defekt_unterwegs"    # Velo fiel nach kurzer Fahrt aus
-FLAG_FREE_WINDOW = "gratiszeit_zurueckgesetzt"
+FLAG_LONG_BEFORE_NEXT = "neumiete_nach_langer_fahrt"
 
 
 def haversine_km(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
@@ -129,13 +135,15 @@ def _chain_journeys(
       an ihrer Startstation — ``defekt_sofort``.
     * Das Velo fiel unterwegs aus. Man stellt es ab, wo man gerade ist, und
       nimmt das nächste, um ans Ziel zu kommen — ``defekt_unterwegs``.
-    * Die Fahrt lief lange genug, dass eine neue Miete die Gratiszeit
-      zurücksetzt, bevor die freien 30 Minuten ablaufen —
-      ``gratiszeit_zurueckgesetzt``. Kein Defekt, aber derselbe Weg.
+    * Die Miete lief lange und wurde trotzdem sofort abgelöst —
+      ``neumiete_nach_langer_fahrt``. Ein Defekt ist hier nicht die
+      naheliegendste Erklärung; die freien 30 Minuten vor Ablauf
+      zurückzusetzen wäre eine, aber die Daten sagen es nicht. Derselbe Weg
+      ist es in jedem Fall.
 
     Ob die Miete an ihrer Startstation endete, trennt die beiden Defektarten.
-    Ob sie länger als ``FREE_WINDOW_RESET_SECONDS`` dauerte, trennt Defekt
-    von Absicht.
+    Ob sie länger als ``FREE_WINDOW_RESET_SECONDS`` dauerte, trennt den
+    Defekt von dem Fall, über den sich nichts sagen lässt.
     """
     reihenfolge = sorted(
         (i for i, (start, _) in enumerate(zeiten) if start is not None),
@@ -159,7 +167,7 @@ def _chain_journeys(
         dauer = rows[i]["duration_seconds"]
 
         if isinstance(dauer, int) and dauer > FREE_WINDOW_RESET_SECONDS:
-            _add_flag(rows[i], FLAG_FREE_WINDOW)
+            _add_flag(rows[i], FLAG_LONG_BEFORE_NEXT)
         elif rows[i]["is_round_trip"]:
             _add_flag(rows[i], FLAG_DEFECT_IMMEDIATE)
         else:
@@ -304,7 +312,7 @@ def enrich_rides(
         "auffaellig": len(flagged),
         "defekt_sofort": _zaehle(FLAG_DEFECT_IMMEDIATE),
         "defekt_unterwegs": _zaehle(FLAG_DEFECT_UNDERWAY),
-        "gratiszeit_zurueckgesetzt": _zaehle(FLAG_FREE_WINDOW),
+        "neumiete_nach_langer_fahrt": _zaehle(FLAG_LONG_BEFORE_NEXT),
         "auffaellige_fahrten": [
             f"{r['start_date'][:16]} {r['start_station']} -> {r['end_station']} "
             f"({r['duration_seconds']} s, {r['speed_kmh_luftlinie']} km/h) "

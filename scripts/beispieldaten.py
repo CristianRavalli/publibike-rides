@@ -13,7 +13,7 @@ ausgeführt entsteht zweimal derselbe Datensatz.
 
 Eingebaut sind bewusst die Muster, die die Pipeline erkennen soll —
 Pendelverkehr mit schwachem Mittwoch, abgebrochene Mieten beider Arten und
-ein Zurücksetzen der Gratiszeit. Wer die Regeln prüfen will, hat damit einen
+eine lange Miete, die sofort abgelöst wird. Wer die Regeln prüfen will, hat einen
 Datensatz, bei dem die richtige Antwort bekannt ist.
 """
 
@@ -161,7 +161,7 @@ def _weg(
     if rng.random() < 0.11 and gesamt_s > 300:
         zwischen = rng.choice([s for s in WEITERE if s not in (von, nach)])
         teil1 = _fahrzeit_sekunden(_km(von, zwischen, stationen), rng)
-        if teil1 < 1100:  # sonst wäre es das Zurücksetzen der Gratiszeit
+        if teil1 < 1100:  # darüber greift die andere Markierung
             mieten.append(_miete(rng, jetzt, teil1, von, zwischen, stationen))
             jetzt += timedelta(seconds=teil1 + rng.randint(7, 60))
             teil2 = _fahrzeit_sekunden(_km(zwischen, nach, stationen), rng)
@@ -196,8 +196,8 @@ def erzeuge(stationen: Dict[str, dict]) -> List[dict]:
             mieten += _weg(rng, heim, ARBEIT, ZUHAUSE, stationen)
         tag += timedelta(days=1)
 
-    # Eine lange Fahrt, bei der die Gratiszeit vor den freien 30 Minuten
-    # zurückgesetzt wird. Kein Defekt, aber derselbe Weg.
+    # Eine lange Miete, die trotzdem sofort abgelöst wird. Kein Defekt,
+    # aber derselbe Weg — der Fall, über dessen Ursache sich nichts sagen lässt.
     umweg = WEITERE[2]
     lang = datetime(2026, 7, 14, 18, 12, 0)
     dauer1 = 1520
@@ -252,7 +252,7 @@ def main() -> int:
     print(f"{bericht['rides']} Mieten -> {bericht['wege']} Wege -> {ZIEL}/rides_geo.csv")
     print(f"  Velo lief gar nicht erst:  {bericht['defekt_sofort']}")
     print(f"  Velo fiel unterwegs aus:   {bericht['defekt_unterwegs']}")
-    print(f"  Gratiszeit zurückgesetzt:  {bericht['gratiszeit_zurueckgesetzt']}")
+    print(f"  Lange Miete, sofort abgelöst: {bericht['neumiete_nach_langer_fahrt']}")
     print(f"  ohne Koordinaten:          {bericht['ohne_koordinaten']}")
     return 0
 

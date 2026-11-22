@@ -55,7 +55,8 @@ Daten nachweisen lassen**, obwohl die API kein solches Feld kennt. Wer ein
 Velo nimmt, das nicht läuft, und sofort das nächste nimmt, hinterlässt zwei
 Mieten dicht hintereinander. Ob die erste an ihrer Startstation endete, sagt,
 ob der Defekt sofort oder erst unterwegs auffiel. Und ob sie länger als 20
-Minuten dauerte, trennt den Defekt vom bewussten Zurücksetzen der Gratiszeit.
+Minuten dauerte, trennt den Defekt von dem Fall, über dessen Ursache sich
+nichts sagen lässt.
 
 Beide Schwellen liegen in einer Lücke der Verteilung, nicht im Gedränge — sie
 lassen sich verschieben, ohne dass sich das Ergebnis ändert. Das ist der
@@ -88,8 +89,12 @@ nicht, dass sie erfolgreich war, sondern nur, wann der Defekt auffiel.
 Dieser Unterschied steht in keinen Daten. Er kam aus der Erfahrung, das
 System täglich zu benutzen, und erst danach liess er sich in den Zahlen
 nachweisen — die Fahrzeiten der betroffenen Mieten springen von 14.9 auf 26.1
-Minuten, mit nichts dazwischen. So entstand die 20-Minuten-Grenze, die Defekt
-von bewusstem Zurücksetzen der Gratiszeit trennt.
+Minuten, mit nichts dazwischen. So entstand die 20-Minuten-Grenze, oberhalb
+derer ein Defekt nicht mehr die naheliegende Erklärung ist.
+
+Dieselbe Ehrlichkeit verlangt den Nachsatz: Oberhalb der Grenze steht ein
+einziger Datenpunkt. Die Markierung heisst deshalb `neumiete_nach_langer_fahrt`
+und benennt das Beobachtete, nicht ein vermutetes Motiv.
 
 ---
 
@@ -256,14 +261,24 @@ Weg. Dafür gibt es drei Gründe, und die Daten erlauben, sie auseinanderzuhalte
 |---|---|---|
 | `defekt_sofort` | Das Velo lief gar nicht erst. | Die Miete endet an ihrer Startstation. |
 | `defekt_unterwegs` | Das Velo fiel nach kurzer Fahrt aus; man stellt es ab, wo man ist, und nimmt das nächste, um ans Ziel zu kommen. | Die Miete ging woanders hin und dauerte höchstens 20 Minuten. |
-| `gratiszeit_zurueckgesetzt` | Kein Defekt: Neue Miete, damit die freien 30 Minuten nicht reissen. | Die Miete dauerte länger als 20 Minuten. |
+| `neumiete_nach_langer_fahrt` | Lange Miete, trotzdem sofort abgelöst. Ein Defekt ist hier nicht die naheliegende Erklärung — was es stattdessen war, sagen die Daten nicht. | Die Miete dauerte länger als 20 Minuten. |
 
 Beide Schwellen sind unempfindlich, und das spricht für die Regel. Zwischen 60
 und 234 Sekunden kommt keine einzige Lücke vor, also liefern 1, 2 und 3
-Minuten dasselbe. Und die Fahrzeiten springen von 896
-Sekunden direkt auf 1565, also liefert jede Grenze zwischen 15 und 26 Minuten
-dasselbe. Von 258 Mieten entfielen 11 auf `defekt_sofort`, 32 auf
-`defekt_unterwegs` und eine auf `gratiszeit_zurueckgesetzt`.
+Minuten dasselbe. Und die Fahrzeiten springen von 896 Sekunden direkt auf
+1565, also liefert jede Grenze zwischen 15 und 26 Minuten dasselbe. Von 258
+Mieten entfielen 11 auf `defekt_sofort`, 32 auf `defekt_unterwegs` und eine
+auf `neumiete_nach_langer_fahrt`.
+
+Bei der letzten Markierung ist Vorsicht angebracht, und sie steht hier als
+Beispiel dafür, wie weit eine Regel tragen darf. Die 20-Minuten-Grenze liegt
+zwar in einer breiten Lücke — aber oberhalb davon steht **ein einziger
+Datenpunkt**. Dass ein Velo nach 26 Minuten ausfällt, ist nicht unmöglich; es
+ist nur weniger wahrscheinlich als nach zwei. Deshalb benennt die Markierung,
+was beobachtet wurde, und nicht, warum. Ein naheliegender Grund wäre, die
+freien 30 Minuten vor Ablauf zurückzusetzen — belegen lässt sich das mit einem
+Fall nicht, und ein Spaltenwert, der eine Absicht behauptet, wandert sonst
+ungeprüft in die Auswertung des Nächsten.
 
 **Die Zähleinheit ist der Weg, nicht die Miete.** Zusammenhängende Mieten
 bekommen dieselbe `journey_id`, dazu `journey_leg` und `journey_legs`. Aus 258

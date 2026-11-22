@@ -222,7 +222,7 @@ def qualitaet(rides: pd.DataFrame) -> str:
         axes[1].scatter(teil["minuten"], [name] * len(teil), alpha=0.6, s=55, color=FARBE)
     axes[1].axvline(20, color="#C0392B", linestyle="--", label="Schwelle 20 Min")
     axes[1].set_xlabel("Fahrzeit der Miete (Minuten)")
-    axes[1].set_title("Defekt oder Gratiszeit?")
+    axes[1].set_title("Ab wann ist ein Defekt nicht mehr die naheliegende Erklärung?")
     axes[1].legend(loc="lower right")
 
     for ax in axes:

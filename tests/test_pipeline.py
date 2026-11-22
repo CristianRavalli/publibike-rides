@@ -166,15 +166,15 @@ class TestVorzeitigBeendeteMieten(unittest.TestCase):
         self.assertIn("defekt_unterwegs", zeile["quality_flag"])
         self.assertEqual(report["defekt_unterwegs"], 1)
 
-    def test_lange_fahrt_ist_gratiszeit_statt_defekt(self):
-        # Ueber 20 Minuten: neue Miete, um die freien 30 Minuten nicht zu reissen.
+    def test_lange_fahrt_gilt_nicht_als_defekt(self):
+        # Ueber 20 Minuten: ein Defekt ist nicht die naheliegendste Erklaerung.
         zeile, report = self._erste(
             self._paar(
                 "2026-11-05 12:00:00", "2026-11-05 12:25:00", "2026-11-05 12:25:30",
                 kam_vom_fleck=True,
             )
         )
-        self.assertIn("gratiszeit_zurueckgesetzt", zeile["quality_flag"])
+        self.assertIn("neumiete_nach_langer_fahrt", zeile["quality_flag"])
         self.assertEqual(report["defekt_unterwegs"], 0)
 
     def test_ueberlappung_zaehlt_auch(self):
