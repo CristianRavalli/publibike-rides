@@ -16,9 +16,20 @@ import math
 from collections import Counter, defaultdict
 from datetime import datetime
 
-from js import L, document
+from js import L, Object, document
+from pyodide.ffi import to_js
 from pyodide.http import pyfetch
 from pyscript import when
+
+
+def js_wert(wert):
+    """Python-Werte in echte JavaScript-Werte umwandeln.
+
+    Pyodide reicht Listen und Dicts sonst als Proxy weiter. Leaflet sucht
+    darin ein .lat und findet null — die Karte bleibt leer, ohne dass etwas
+    im Log steht, das auf die Ursache zeigt.
+    """
+    return to_js(wert, dict_converter=Object.fromEntries)
 
 BEISPIEL = "./beispiel.csv"
 
@@ -252,28 +263,31 @@ def zeige_karte(zeilen):
     mitte_lon = sum(p[1] for p in koordinaten.values()) / len(koordinaten)
 
     if _karte is None:
-        _karte = L.map("karte").setView([mitte_lat, mitte_lon], 13)
+        _karte = L.map("karte")
+        _karte.setView(js_wert([mitte_lat, mitte_lon]), 13)
         L.tileLayer(
             "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
-            {"attribution": "&copy; OpenStreetMap", "maxZoom": 19},
+            js_wert({"attribution": "&copy; OpenStreetMap", "maxZoom": 19}),
         ).addTo(_karte)
     else:
         for ebene in _ebenen:
             _karte.removeLayer(ebene)
         _ebenen = []
-        _karte.setView([mitte_lat, mitte_lon], 13)
+        _karte.setView(js_wert([mitte_lat, mitte_lon]), 13)
 
     oben = strecken(zeilen, 20)
     hoechst = max((a for _, a in oben), default=1)
     for (von, nach), anzahl in oben:
         if von in koordinaten and nach in koordinaten:
             linie = L.polyline(
-                [list(koordinaten[von]), list(koordinaten[nach])],
-                {
-                    "color": AKZENT,
-                    "weight": 1 + 6 * anzahl / hoechst,
-                    "opacity": 0.45,
-                },
+                js_wert([list(koordinaten[von]), list(koordinaten[nach])]),
+                js_wert(
+                    {
+                        "color": AKZENT,
+                        "weight": 1 + 6 * anzahl / hoechst,
+                        "opacity": 0.45,
+                    }
+                ),
             )
             linie.bindTooltip(f"{von} → {nach}: {anzahl} Fahrten")
             linie.addTo(_karte)
@@ -283,14 +297,16 @@ def zeige_karte(zeilen):
     for name, (lat, lon) in koordinaten.items():
         anzahl = nutzung.get(name, 0)
         kreis = L.circleMarker(
-            [lat, lon],
-            {
-                "radius": 4 + 13 * anzahl / groesster,
-                "color": AKZENT,
-                "weight": 1,
-                "fillColor": AKZENT_HELL,
-                "fillOpacity": 0.85,
-            },
+            js_wert([lat, lon]),
+            js_wert(
+                {
+                    "radius": 4 + 13 * anzahl / groesster,
+                    "color": AKZENT,
+                    "weight": 1,
+                    "fillColor": AKZENT_HELL,
+                    "fillOpacity": 0.85,
+                }
+            ),
         )
         kreis.bindTooltip(f"{name}: {anzahl} mal genutzt")
         kreis.addTo(_karte)
@@ -315,11 +331,29 @@ def zeichne(zeilen, titel, zeile):
     _text("quelle-titel").textContent = titel
     _text("quelle-zeile").textContent = zeile
 
-    zeige_kacheln(zeilen)
-    zeige_karte(zeilen)
-    zeige_muster(zeilen)
-    zeige_qualitaet(zeilen)
-    zeige_strecken(zeilen)
+    # Jeder Abschnitt für sich: Scheitert einer, bleiben die anderen stehen
+    # und man sieht, welcher es war. Zuvor nahm ein Fehler in der Karte
+    # kommentarlos alles mit, was nach ihr kam.
+    abschnitte = [
+        ("Überblick", zeige_kacheln, "kacheln"),
+        ("Karte", zeige_karte, "karte"),
+        ("Zeitmuster", zeige_muster, "muster"),
+        ("Datenqualität", zeige_qualitaet, "qualitaet"),
+        ("Strecken", zeige_strecken, "strecken"),
+    ]
+    gescheitert = []
+    for name, aufgabe, knoten_id in abschnitte:
+        try:
+            aufgabe(zeilen)
+        except Exception as fehler:  # noqa: BLE001
+            gescheitert.append(f"{name} ({fehler})")
+            _text(knoten_id).innerHTML = (
+                f'<p class="hinweis">Dieser Abschnitt konnte nicht '
+                f"aufgebaut werden: {fehler}</p>"
+            )
+
+    if gescheitert:
+        melde_fehler("Nicht alles liess sich darstellen: " + "; ".join(gescheitert))
 
 
 def spanne(zeilen):
