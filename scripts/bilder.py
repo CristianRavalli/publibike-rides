@@ -235,11 +235,31 @@ def qualitaet(rides: pd.DataFrame) -> str:
     return pfad
 
 
+def beispiel_fuer_dashboard() -> str:
+    """Legt die Beispieldaten neben das Dashboard.
+
+    Die Seite unter docs/ wird von GitHub Pages ausgeliefert und kann nur auf
+    Dateien zugreifen, die dort liegen. Deshalb eine Kopie statt eines Pfads
+    nach data/.
+    """
+    import shutil
+
+    pfad = os.path.join(ZIEL, "beispiel.csv")
+    shutil.copyfile(QUELLE, pfad)
+    return pfad
+
+
 def main() -> int:
     os.makedirs(ZIEL, exist_ok=True)
     rides = lade()
     print(f"{len(rides)} Mieten aus {QUELLE}")
-    for pfad in (karte(rides), karte_png(rides), muster(rides), qualitaet(rides)):
+    for pfad in (
+        karte(rides),
+        karte_png(rides),
+        muster(rides),
+        qualitaet(rides),
+        beispiel_fuer_dashboard(),
+    ):
         print(f"  {pfad}")
     return 0
 

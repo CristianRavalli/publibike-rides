@@ -1,0 +1,180 @@
+<!doctype html>
+<html lang="de">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>PubliBike-Fahrten — Auswertung</title>
+    <meta
+      name="description"
+      content="Eigene PubliBike-Fahrten auswerten. Die Datei bleibt im Browser und wird nicht hochgeladen."
+    />
+
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+    <link rel="stylesheet" href="https://pyscript.net/releases/2024.1.1/core.css" />
+    <script type="module" src="https://pyscript.net/releases/2024.1.1/core.js"></script>
+    <py-config>
+      packages = []
+    </py-config>
+
+    <style>
+      :root {
+        color-scheme: light dark;
+        --flaeche: #ffffff;
+        --hintergrund: #f6f4f7;
+        --text: #221b24;
+        --gedaempft: #6b6270;
+        --rand: #e2dde5;
+        --akzent: #6e2c50;
+        --akzent-hell: #c39bd3;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --flaeche: #1d1920;
+          --hintergrund: #141116;
+          --text: #ece8ee;
+          --gedaempft: #a79fad;
+          --rand: #332c36;
+          --akzent: #c98fb0;
+          --akzent-hell: #7d5a90;
+        }
+      }
+
+      * { box-sizing: border-box; }
+
+      body {
+        margin: 0;
+        background: var(--hintergrund);
+        color: var(--text);
+        font: 16px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      }
+
+      .huelle { max-width: 1060px; margin: 0 auto; padding: 32px 16px 72px; }
+
+      header h1 { margin: 0 0 6px; font-size: 1.7rem; letter-spacing: -0.01em; }
+      header p { margin: 0; color: var(--gedaempft); }
+
+      .quelle {
+        display: flex; flex-wrap: wrap; gap: 14px; align-items: center;
+        margin: 24px 0 28px; padding: 16px 18px;
+        background: var(--flaeche); border: 1px solid var(--rand); border-radius: 12px;
+      }
+      .quelle__text { flex: 1 1 320px; min-width: 0; }
+      .quelle__text strong { display: block; }
+      .quelle__text span { color: var(--gedaempft); font-size: 0.9rem; }
+
+      label.datei {
+        display: inline-block; padding: 9px 16px; border-radius: 8px; cursor: pointer;
+        background: var(--akzent); color: #fff; font-size: 0.92rem; font-weight: 600;
+        border: none;
+      }
+      @media (prefers-color-scheme: dark) { label.datei { color: #1d1920; } }
+      label.datei:hover { filter: brightness(1.08); }
+      input[type="file"] { display: none; }
+
+      h2 {
+        font-size: 1.1rem; margin: 40px 0 14px;
+        padding-bottom: 8px; border-bottom: 1px solid var(--rand);
+      }
+      h2:first-of-type { margin-top: 28px; }
+
+      .kacheln { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(148px, 1fr)); }
+      .kachel {
+        background: var(--flaeche); border: 1px solid var(--rand);
+        border-radius: 12px; padding: 16px 18px;
+      }
+      .kachel b { display: block; font-size: 1.65rem; line-height: 1.2; letter-spacing: -0.02em; }
+      .kachel span { color: var(--gedaempft); font-size: 0.85rem; }
+
+      #karte {
+        height: 440px; border-radius: 12px;
+        border: 1px solid var(--rand); background: var(--flaeche);
+      }
+      .leaflet-container { border-radius: 12px; font: inherit; }
+
+      .tafel {
+        background: var(--flaeche); border: 1px solid var(--rand);
+        border-radius: 12px; padding: 18px;
+      }
+      .diagramme { display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); }
+      .diagramm h3 { margin: 0 0 10px; font-size: 0.92rem; font-weight: 600; color: var(--gedaempft); }
+      svg { display: block; width: 100%; height: auto; overflow: visible; }
+
+      table { width: 100%; border-collapse: collapse; font-size: 0.93rem; }
+      th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--rand); }
+      th { color: var(--gedaempft); font-weight: 600; font-size: 0.82rem; text-transform: uppercase; letter-spacing: 0.03em; }
+      td.zahl, th.zahl { text-align: right; font-variant-numeric: tabular-nums; }
+      tr:last-child td { border-bottom: none; }
+
+      .hinweis {
+        margin-top: 10px; color: var(--gedaempft); font-size: 0.88rem;
+      }
+
+      footer {
+        margin-top: 52px; padding-top: 18px; border-top: 1px solid var(--rand);
+        color: var(--gedaempft); font-size: 0.87rem;
+      }
+      a { color: var(--akzent); }
+
+      #laden { color: var(--gedaempft); padding: 28px 0; }
+      #fehler {
+        display: none; margin: 18px 0; padding: 14px 16px; border-radius: 10px;
+        background: #fdeceb; color: #8c1d18; border: 1px solid #f5c6c2;
+      }
+    </style>
+  </head>
+
+  <body>
+    <div class="huelle">
+      <header>
+        <h1>PubliBike-Fahrten</h1>
+        <p>Auswertung der eigenen Fahrtenhistorie — Kennzahlen, Muster, Karte.</p>
+      </header>
+
+      <div class="quelle">
+        <div class="quelle__text">
+          <strong id="quelle-titel">Beispieldaten</strong>
+          <span id="quelle-zeile">werden geladen …</span>
+        </div>
+        <label class="datei" for="datei">Eigene rides_geo.csv öffnen</label>
+        <input type="file" id="datei" accept=".csv,text/csv" />
+      </div>
+
+      <div id="fehler"></div>
+      <div id="laden">Python wird im Browser gestartet — einen Moment.</div>
+
+      <div id="inhalt" hidden>
+        <h2>Überblick</h2>
+        <div class="kacheln" id="kacheln"></div>
+
+        <h2>Wo</h2>
+        <div id="karte"></div>
+        <p class="hinweis">
+          Kreisgrösse nach Nutzung, Linienstärke nach Anzahl Fahrten. Die Linien
+          sind gerade — sie zeigen, welche Stationen verbunden sind, nicht den
+          gefahrenen Weg.
+        </p>
+
+        <h2>Wann</h2>
+        <div class="tafel diagramme" id="muster"></div>
+
+        <h2>Datenqualität</h2>
+        <div class="tafel" id="qualitaet"></div>
+
+        <h2>Häufigste Strecken</h2>
+        <div class="tafel"><div id="strecken"></div></div>
+      </div>
+
+      <footer>
+        Die geöffnete Datei bleibt im Browser. Sie wird nicht hochgeladen, nicht
+        gespeichert und nicht weitergegeben — die Auswertung läuft als Python
+        über <a href="https://pyscript.net/">PyScript</a> auf diesem Gerät.
+        Kartendaten &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>.
+        Quellcode auf <a href="https://github.com/CristianRavalli/publibike-rides">GitHub</a>.
+      </footer>
+    </div>
+
+    <script type="py" src="./dashboard.py"></script>
+  </body>
+</html>
