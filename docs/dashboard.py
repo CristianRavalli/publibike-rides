@@ -31,7 +31,9 @@ def js_wert(wert):
     """
     return to_js(wert, dict_converter=Object.fromEntries)
 
-BEISPIEL = "./beispiel.csv"
+# Mit Versionsangabe, damit ein wiederkehrender Besucher nicht die alten
+# Beispieldaten aus dem Cache bekommt. Siehe Kommentar in index.html.
+BEISPIEL = "./beispiel.csv?v=2"
 
 AKZENT = "#6e2c50"
 AKZENT_HELL = "#c39bd3"
