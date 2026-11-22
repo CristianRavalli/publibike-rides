@@ -10,14 +10,29 @@ on:
 jobs:
   tests:
     name: Tests auf Python ${{ matrix.python }}
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.runner }}
     strategy:
       fail-fast: false
       matrix:
         # Das README verspricht Python 3.9 oder neuer. Geprüft wird deshalb
         # die unterste und die oberste unterstützte Fassung, plus eine
         # dazwischen — sonst ist das Versprechen nur eine Behauptung.
-        python: ["3.9", "3.11", "3.13"]
+        #
+        # 3.9 ist seit Oktober 2025 End-of-Life und auf ubuntu-latest
+        # (inzwischen Ubuntu 26.04) nicht mehr verfügbar. Trotzdem bleibt es
+        # in der Matrix, denn es ist das System-Python von macOS: Wer dort
+        # "python3" eintippt, bekommt 3.9. Genau darauf beruht das
+        # Versprechen, dass der Download ohne Installation läuft. Deshalb
+        # läuft dieser eine Job auf einem älteren Abbild, das 3.9 noch
+        # anbietet. Fällt auch das weg, schlägt der Lauf auf — und dann ist
+        # es Zeit, die Zusage im README zu ändern statt die Prüfung.
+        include:
+          - python: "3.9"
+            runner: ubuntu-24.04
+          - python: "3.11"
+            runner: ubuntu-latest
+          - python: "3.13"
+            runner: ubuntu-latest
 
     steps:
       - uses: actions/checkout@v4
