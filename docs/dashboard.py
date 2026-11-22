@@ -134,20 +134,34 @@ def lies_csv(inhalt):
 # ------------------------------------------------------------------ Auswertung
 
 
+def perzentil(werte, p):
+    """p-tes Perzentil nach der Methode des nächsten Rangs.
+
+    Bewusst ohne Interpolation: Der zurückgegebene Wert ist eine tatsächlich
+    vorgekommene Fahrzeit und keine gerechnete Zwischengrösse.
+    """
+    if not werte:
+        return 0.0
+    sortiert = sorted(werte)
+    rang = max(1, math.ceil(p / 100 * len(sortiert)))
+    return sortiert[min(rang, len(sortiert)) - 1]
+
+
 def kennzahlen(zeilen):
     dauern = [_zahl(z.get("duration_seconds")) for z in zeilen]
+    echte = [d for d in dauern if d > 0]
     stunden = sum(dauern) / 3600
     tage = {z.get("date") or (z.get("start_date") or "")[:10] for z in zeilen}
     wege = {z.get("journey_id") for z in zeilen if z.get("journey_id")}
     stationen = {z.get("start_station") for z in zeilen} | {z.get("end_station") for z in zeilen}
-    sortiert = sorted(d for d in dauern if d > 0)
-    median = sortiert[len(sortiert) // 2] / 60 if sortiert else 0
 
     return [
         (f"{len(zeilen)}", "Mieten"),
         (f"{len(wege) or len(zeilen)}", "Wege"),
         (f"{stunden:.0f} h", "unterwegs"),
-        (f"{median:.0f} min", "Median je Miete"),
+        (f"{perzentil(echte, 50) / 60:.0f} min", "Hälfte ist kürzer"),
+        (f"{perzentil(echte, 75) / 60:.0f} min", "drei Viertel sind kürzer"),
+        (f"{perzentil(echte, 95) / 60:.0f} min", "95 % sind kürzer"),
         (f"{len(tage - {''})}", "aktive Tage"),
         (f"{len(stationen - {None, ''})}", "Stationen"),
     ]
@@ -265,6 +279,63 @@ def zeige_strecken(zeilen):
     )
 
 
+def zeige_laengste(zeilen, anzahl=10):
+    """Die längsten Wege, nicht die längsten Mieten.
+
+    Eine Fahrt, die wegen eines defekten Velos in zwei Mieten zerfiel, wäre
+    sonst als zwei kurze aufgeführt statt als eine lange — und genau die
+    unterbrochenen Fahrten sind oft die interessanten.
+    """
+    wege = defaultdict(list)
+    for z in zeilen:
+        wege[z.get("journey_id") or z.get("ride_id") or id(z)].append(z)
+
+    liste = []
+    for teile in wege.values():
+        teile = sorted(teile, key=lambda z: z.get("start_date") or "")
+        liste.append(
+            {
+                "datum": (teile[0].get("start_date") or "")[:16],
+                "von": teile[0].get("start_station", ""),
+                "nach": teile[-1].get("end_station", ""),
+                "minuten": sum(_zahl(z.get("duration_seconds")) for z in teile) / 60,
+                "km": sum(_zahl(z.get("distance_km_luftlinie")) for z in teile),
+                "mieten": len(teile),
+            }
+        )
+
+    liste.sort(key=lambda w: w["minuten"], reverse=True)
+    oben = liste[:anzahl]
+    if not oben:
+        _text("laengste").innerHTML = "<p>Keine Wege gefunden.</p>"
+        return
+
+    reihen = "".join(
+        f"<tr><td>{w['datum']}</td><td>{w['von']}</td><td>{w['nach']}</td>"
+        f'<td class="zahl">{w["minuten"]:.0f}</td>'
+        f'<td class="zahl">{w["km"]:.1f}</td>'
+        f'<td class="zahl">{w["mieten"] if w["mieten"] > 1 else ""}</td></tr>'
+        for w in oben
+    )
+    mehrteilig = sum(1 for w in oben if w["mieten"] > 1)
+    _text("laengste").innerHTML = (
+        "<table><thead><tr><th>Wann</th><th>Von</th><th>Nach</th>"
+        '<th class="zahl">Minuten</th><th class="zahl">km Luftlinie</th>'
+        '<th class="zahl">Mieten</th></tr></thead>'
+        f"<tbody>{reihen}</tbody></table>"
+        '<p class="hinweis">Gezählt wird der <strong>Weg</strong>, nicht die '
+        "einzelne Miete: Eine Fahrt, die unterwegs auf ein anderes Velo "
+        "wechselte, erscheint als eine Zeile. Die Spalte ganz rechts zeigt, "
+        "aus wie vielen Mieten sie bestand — leer heisst eine."
+        + (
+            f" Hier trifft das auf {mehrteilig} der {len(oben)} längsten Wege zu."
+            if mehrteilig
+            else ""
+        )
+        + "</p>"
+    )
+
+
 def zeige_karte(zeilen):
     global _karte, _ebenen
 
@@ -376,6 +447,7 @@ def zeichne(zeilen, titel, zeile):
         ("Karte", zeige_karte, "karte"),
         ("Zeitmuster", zeige_muster, "muster"),
         ("Datenqualität", zeige_qualitaet, "qualitaet"),
+        ("Längste Wege", zeige_laengste, "laengste"),
         ("Strecken", zeige_strecken, "strecken"),
     ]
     gescheitert = []
