@@ -119,7 +119,7 @@ aussehend und nicht haltbar.
 
 ## Zum Ausprobieren ohne eigenes Konto
 
-Im Repository liegt unter `data/beispiel/` ein **erfundener** Datensatz: 402
+Im Repository liegt unter `data/beispiel/` ein **erfundener** Datensatz: 421
 Mieten über acht Monate. Die Stationen und ihre Koordinaten sind echt, die
 Fahrten nicht. Das Notebook greift automatisch darauf zurück, wenn keine
 eigenen Daten da sind, und sagt in der ersten Zelle, welche Quelle es benutzt.

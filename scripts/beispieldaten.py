@@ -12,9 +12,17 @@ ausgeführt entsteht zweimal derselbe Datensatz.
     python3 scripts/beispieldaten.py
 
 Eingebaut sind bewusst die Muster, die die Pipeline erkennen soll —
-Pendelverkehr mit schwachem Mittwoch, abgebrochene Mieten beider Arten und
-eine lange Miete, die sofort abgelöst wird. Wer die Regeln prüfen will, hat einen
+Pendelverkehr mit schwachem Tag, abgebrochene Mieten beider Arten und eine
+lange Miete, die sofort abgelöst wird. Wer die Regeln prüfen will, hat einen
 Datensatz, bei dem die richtige Antwort bekannt ist.
+
+Was er nicht leistet: Die Verteilung der Fahrzeiten ist zweigipflig — kurze
+Fahrten im Quartier, dazu der immer ähnlich lange Arbeitsweg. Echte Daten
+verlaufen gleitender. Das liegt daran, dass hier eine einzige erfundene
+Person zwischen wenigen, eng beieinanderliegenden Stationen pendelt. Es
+liesse sich glattbügeln, aber nur mit Eingriffen, die den Datensatz weiter
+von dem entfernen, was er abbilden soll. Für seinen Zweck — die Regeln
+prüfbar machen und die Oberfläche vorführen — genügt er so.
 """
 
 from __future__ import annotations
@@ -65,6 +73,16 @@ WEITERE = [
     "Kirche Unterstrass - Zürich",
     "Letzistrasse - Zürich",
     "Airgate - Leutschenbach - Zürich",
+]
+
+# Weiter entfernte Ziele für gelegentliche längere Fahrten. Ohne sie sind
+# alle erfundenen Fahrten ungefähr gleich lang, weil die Stationen eng
+# beieinanderliegen — die Perzentile im Dashboard lägen dann alle auf
+# demselben Wert und sähen aus wie ein Fehler.
+WEIT = [
+    "Bahnhof Stettbach - Zürich",      # 4.2 km von Oerlikon
+    "Bahnhof Wallisellen - Zürich",    # 3.6 km
+    "ETH Hönggerberg - Zürich",        # 2.8 km
 ]
 
 # Wie oft an einem Wochentag überhaupt gefahren wird. Der Freitag ist
@@ -179,9 +197,15 @@ def erzeuge(stationen: Dict[str, dict]) -> List[dict]:
     tag = START_TAG
     while tag <= END_TAG:
         if rng.random() < FAHRWAHRSCHEINLICHKEIT[tag.weekday()]:
-            # Hinweg am Morgen
+            # Hinweg am Morgen. Start und Ziel weichen manchmal auf eine
+            # Nachbarstation aus — wer kein freies Velo am nächsten Dock
+            # findet, nimmt das übernächste. Ohne diese Streuung hätten alle
+            # Pendelfahrten dieselbe Länge, und die Perzentile im Dashboard
+            # lägen praktisch aufeinander.
+            von = rng.choice(WEITERE) if rng.random() < 0.25 else ZUHAUSE
+            nach = rng.choice(WEITERE) if rng.random() < 0.25 else ARBEIT
             los = tag.replace(hour=7, minute=0) + timedelta(minutes=rng.randint(0, 95))
-            mieten += _weg(rng, los, ZUHAUSE, ARBEIT, stationen)
+            mieten += _weg(rng, los, von, nach, stationen)
 
             # Mittags manchmal eine Besorgung
             if rng.random() < 0.35:
@@ -191,23 +215,50 @@ def erzeuge(stationen: Dict[str, dict]) -> List[dict]:
                 zurueck = mittag + timedelta(minutes=rng.randint(20, 90))
                 mieten += _weg(rng, zurueck, ziel, ARBEIT, stationen)
 
-            # Rückweg am Abend
+            # Rückweg am Abend, mit derselben Streuung
+            ab = rng.choice(WEITERE) if rng.random() < 0.25 else ARBEIT
+            an = rng.choice(WEITERE) if rng.random() < 0.25 else ZUHAUSE
             heim = tag.replace(hour=16, minute=0) + timedelta(minutes=rng.randint(0, 170))
-            mieten += _weg(rng, heim, ARBEIT, ZUHAUSE, stationen)
+            mieten += _weg(rng, heim, ab, an, stationen)
+
+            # Ab und zu ein weiteres Ziel ausserhalb des Quartiers. Ohne
+            # solche Fahrten sind alle Dauern beinahe gleich, weil die
+            # Pendelstrecke immer dieselbe ist.
+            if rng.random() < 0.12:
+                fern = rng.choice(WEIT)
+                raus = tag.replace(hour=18, minute=0) + timedelta(minutes=rng.randint(0, 120))
+                mieten += _weg(rng, raus, ZUHAUSE, fern, stationen)
+                mieten += _weg(
+                    rng, raus + timedelta(minutes=rng.randint(40, 180)),
+                    fern, ZUHAUSE, stationen,
+                )
         tag += timedelta(days=1)
 
     # Eine lange Miete, die trotzdem sofort abgelöst wird. Kein Defekt,
     # aber derselbe Weg — der Fall, über dessen Ursache sich nichts sagen lässt.
-    umweg = WEITERE[2]
+    #
+    # Die Dauer leitet sich aus der Strecke ab, nicht aus einer gesetzten
+    # Zahl. Eine frühere Fassung verbuchte 38 Minuten für 700 Meter; das
+    # sind 1 km/h, und wer in die Tabelle der längsten Wege schaut, sieht
+    # sofort, dass die Daten erfunden sind.
+    umweg = WEIT[0]
     lang = datetime(2026, 7, 14, 18, 12, 0)
-    dauer1 = 1520
+    dauer1 = max(1260, _fahrzeit_sekunden(_km(ARBEIT, umweg, stationen), rng))
     mieten.append(_miete(rng, lang, dauer1, ARBEIT, umweg, stationen))
     weiter = lang + timedelta(seconds=dauer1 + 25)
-    mieten.append(_miete(rng, weiter, 540, umweg, ZUHAUSE, stationen))
+    mieten.append(
+        _miete(rng, weiter, _fahrzeit_sekunden(_km(umweg, ZUHAUSE, stationen), rng),
+               umweg, ZUHAUSE, stationen)
+    )
 
-    # Zwei Fahrten, bei denen Guthaben verbraucht wurde.
+    # Zwei Fahrten, bei denen Guthaben verbraucht wurde — ebenfalls mit einer
+    # Dauer, die zur Strecke passt.
     for wann in (datetime(2026, 5, 20, 19, 5, 0), datetime(2026, 9, 3, 13, 40, 0)):
-        mieten.append(_miete(rng, wann, 2250, ARBEIT, WEITERE[5], stationen, credit=5))
+        ziel = WEIT[1]
+        mieten.append(
+            _miete(rng, wann, _fahrzeit_sekunden(_km(ARBEIT, ziel, stationen), rng),
+                   ARBEIT, ziel, stationen, credit=5)
+        )
 
     mieten.sort(key=lambda m: m["startDate"], reverse=True)
     return mieten
@@ -218,7 +269,7 @@ def main() -> int:
     alle = fetch_stations()
     nach_name = {s["name"]: s for s in alle}
 
-    gebraucht = [ZUHAUSE, ARBEIT] + WEITERE
+    gebraucht = [ZUHAUSE, ARBEIT] + WEITERE + WEIT
     fehlend = [n for n in gebraucht if n not in nach_name]
     if fehlend:
         print(f"Diese Stationen gibt es im Feed nicht mehr: {fehlend}")

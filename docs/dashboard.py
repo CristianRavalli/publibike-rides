@@ -33,7 +33,7 @@ def js_wert(wert):
 
 # Mit Versionsangabe, damit ein wiederkehrender Besucher nicht die alten
 # Beispieldaten aus dem Cache bekommt. Siehe Kommentar in index.html.
-BEISPIEL = "./beispiel.csv?v=4"
+BEISPIEL = "./beispiel.csv?v=8"
 
 AKZENT = "#6e2c50"
 AKZENT_HELL = "#c39bd3"

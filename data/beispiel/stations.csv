@@ -2,7 +2,10 @@ station_id,station_number,name,lat,lon,address,post_code,capacity
 PIB:Station:1106,1106,Airgate - Leutschenbach - Zürich,47.41453,8.552773,Thurgauerstrasse 40,8050,30
 PIB:Station:1214,1214,Bad Allenmoos - Zürich,47.405754,8.539021,Ringstrasse 82,8057,30
 PIB:Station:1238,1238,Bahnhof Oerlikon - Zürich,47.41106,8.543765,Hofwiesenstrasse 369,8050,50
+PIB:Station:1243,1243,Bahnhof Stettbach - Zürich,47.39719,8.595609,,8051,50
+PIB:Station:1269,1269,Bahnhof Wallisellen - Zürich,47.4121,8.592148,Hammerweg 9,8304,30
 PIB:Station:1225,1225,Berninaplatz - Zürich,47.40382,8.546459,Berninastrasse 41,8057,30
+PIB:Station:1161,1161,ETH Hönggerberg - Zürich,47.407806,8.506827,,8049,60
 PIB:Station:1946,1946,Gubelstrasse - Zürich,47.408306,8.544361,Schulstrasse 3,8050,50
 PIB:Station:1263,1263,Kirche Unterstrass - Zürich,47.38728,8.542349,Turnerstrasse 45,8006,30
 PIB:Station:2025,2025,Letzistrasse - Zürich,47.391113,8.545758,Letzistrasse 6a,8006,50
