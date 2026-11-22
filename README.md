@@ -302,6 +302,12 @@ ist eine Behauptung. Bewusst ohne `pip install`: Pipeline und Tests kommen
 ohne fremde Pakete aus, und schleicht sich eine Abhängigkeit ein, schlägt der
 Lauf fehl.
 
+Der 3.9-Job läuft auf einem älteren Ubuntu-Abbild, weil 3.9 seit Oktober 2025
+End-of-Life ist und auf dem aktuellen nicht mehr angeboten wird. In der Matrix
+bleibt es, weil macOS es als System-Python ausliefert: Wer dort `python3`
+eintippt, bekommt 3.9 — und genau darauf beruht die Zusage, dass der Download
+ohne Installation läuft.
+
 Dazu eine zweite Prüfung:
 
 ```bash
