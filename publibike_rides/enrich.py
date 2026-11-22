@@ -45,6 +45,7 @@ OUTPUT_FIELDS = [
     "vehicle_type",
     "vehicle_label",
     "vehicle_number",
+    "ersetzt_durch",
     "start_station",
     "start_station_id",
     "start_lat",
@@ -78,12 +79,18 @@ MAX_GAP_TO_NEXT_SECONDS = 180
 # Markierung sagt deshalb, was beobachtet wurde, und nicht, warum.
 FREE_WINDOW_RESET_SECONDS = 1200
 
-# Was an einer vorzeitig beendeten Miete beobachtet wurde. Die ersten beiden
-# Namen benennen eine Ursache, weil sie sich aus den Daten ergibt: Ein Velo,
-# das an seiner Startstation abgestellt und sofort durch ein anderes ersetzt
-# wird, war defekt. Der dritte benennt bewusst keine — siehe oben.
-FLAG_DEFECT_IMMEDIATE = "defekt_sofort"      # Velo lief gar nicht erst
-FLAG_DEFECT_UNDERWAY = "defekt_unterwegs"    # Velo fiel nach kurzer Fahrt aus
+# Was an einer vorzeitig beendeten Miete beobachtet wurde. Alle drei Namen
+# beschreiben den Ablauf und behaupten keine Ursache.
+#
+# Frühere Fassungen hiessen defekt_sofort und defekt_unterwegs. Das war zu
+# stark: Eine abgebrochene Miete, auf die ein Velo eines anderen Typs folgt,
+# lässt sich nicht von einem Umstieg unterscheiden. In 16 von 17 Fällen, in
+# denen ein Normalvelo abgebrochen wurde, kam danach ein E-Bike — ob das Velo
+# defekt war oder nur das E-Bike attraktiver, steht nicht in den Daten.
+# Deshalb die Spalte ``ersetzt_durch``: Sie macht genau diese Unterscheidung
+# nachprüfbar, statt sie im Namen der Markierung zu verstecken.
+FLAG_ABORTED_IMMEDIATE = "abbruch_sofort"      # endete an der Startstation
+FLAG_ABORTED_UNDERWAY = "abbruch_unterwegs"    # endete woanders
 FLAG_LONG_BEFORE_NEXT = "neumiete_nach_langer_fahrt"
 
 
@@ -126,24 +133,25 @@ def _add_flag(row: dict, flag: str) -> None:
 def _chain_journeys(
     rows: List[dict], zeiten: List[Tuple[Optional[datetime], Optional[datetime]]]
 ) -> None:
-    """Verkettet Mieten zu Wegen und benennt, warum eine Miete vorzeitig endete.
+    """Verkettet Mieten zu Wegen und beschreibt, wie eine Miete endete.
 
     Folgt eine Miete dicht auf die vorherige, war es in Wahrheit eine Fahrt,
-    die in zwei Mieten zerfiel. Drei Gründe kommen vor:
+    die in zwei Mieten zerfiel. Drei Formen kommen vor:
 
-    * Das Velo lief gar nicht erst. Es kommt nicht vom Fleck, die Miete endet
-      an ihrer Startstation — ``defekt_sofort``.
-    * Das Velo fiel unterwegs aus. Man stellt es ab, wo man gerade ist, und
-      nimmt das nächste, um ans Ziel zu kommen — ``defekt_unterwegs``.
-    * Die Miete lief lange und wurde trotzdem sofort abgelöst —
-      ``neumiete_nach_langer_fahrt``. Ein Defekt ist hier nicht die
-      naheliegendste Erklärung; die freien 30 Minuten vor Ablauf
-      zurückzusetzen wäre eine, aber die Daten sagen es nicht. Derselbe Weg
-      ist es in jedem Fall.
+    * ``abbruch_sofort`` — die Miete endet an ihrer Startstation. Das Velo
+      kam nicht vom Fleck.
+    * ``abbruch_unterwegs`` — die Miete endete woanders und wurde trotzdem
+      sofort abgelöst.
+    * ``neumiete_nach_langer_fahrt`` — die Miete lief länger als
+      ``FREE_WINDOW_RESET_SECONDS``, ein Defekt ist dort nicht die
+      naheliegendste Erklärung.
 
-    Ob die Miete an ihrer Startstation endete, trennt die beiden Defektarten.
-    Ob sie länger als ``FREE_WINDOW_RESET_SECONDS`` dauerte, trennt den
-    Defekt von dem Fall, über den sich nichts sagen lässt.
+    Keine dieser Markierungen nennt eine Ursache, und das ist Absicht. Ein
+    Abbruch, auf den ein Velo eines anderen Typs folgt, kann ein Defekt
+    gewesen sein oder ein Umstieg aufs bessere Fahrzeug — in den Daten sieht
+    beides gleich aus. ``ersetzt_durch`` hält fest, welcher Typ als nächstes
+    kam, damit sich das beim Auswerten trennen lässt: Wird ein Velo durch
+    denselben Typ ersetzt, bleibt der Defekt die plausibelste Erklärung.
     """
     reihenfolge = sorted(
         (i for i, (start, _) in enumerate(zeiten) if start is not None),
@@ -166,12 +174,16 @@ def _chain_journeys(
         gehoert_zum_naechsten.add(i)
         dauer = rows[i]["duration_seconds"]
 
+        # Welcher Velotyp die Miete ablöste — der Schlüssel dazu, ob ein
+        # Abbruch als Defekt durchgeht oder auch ein Umstieg sein könnte.
+        rows[i]["ersetzt_durch"] = rows[j]["vehicle_label"]
+
         if isinstance(dauer, int) and dauer > FREE_WINDOW_RESET_SECONDS:
             _add_flag(rows[i], FLAG_LONG_BEFORE_NEXT)
         elif rows[i]["is_round_trip"]:
-            _add_flag(rows[i], FLAG_DEFECT_IMMEDIATE)
+            _add_flag(rows[i], FLAG_ABORTED_IMMEDIATE)
         else:
-            _add_flag(rows[i], FLAG_DEFECT_UNDERWAY)
+            _add_flag(rows[i], FLAG_ABORTED_UNDERWAY)
 
     # Wege durchnummerieren: eine neue Kette beginnt, wo die vorherige Miete
     # nicht mit dieser verbunden war.
@@ -279,6 +291,7 @@ def enrich_rides(
                 "vehicle_type": vehicle_type,
                 "vehicle_label": VEHICLE_LABELS.get(vehicle_type, "unbekannt"),
                 "vehicle_number": ride.get("vehicleNumber", ""),
+                "ersetzt_durch": "",  # zweiter Durchgang, siehe _chain_journeys
                 "start_station": start_name,
                 "start_station_id": start_station["station_id"] if start_station else "",
                 "start_lat": start_lat if start_lat is not None else "",
@@ -310,9 +323,19 @@ def enrich_rides(
         "unbekannte_startstationen": sorted(unmatched_start),
         "unbekannte_zielstationen": sorted(unmatched_end),
         "auffaellig": len(flagged),
-        "defekt_sofort": _zaehle(FLAG_DEFECT_IMMEDIATE),
-        "defekt_unterwegs": _zaehle(FLAG_DEFECT_UNDERWAY),
+        "abbruch_sofort": _zaehle(FLAG_ABORTED_IMMEDIATE),
+        "abbruch_unterwegs": _zaehle(FLAG_ABORTED_UNDERWAY),
         "neumiete_nach_langer_fahrt": _zaehle(FLAG_LONG_BEFORE_NEXT),
+        # Abbrüche, bei denen derselbe Velotyp nachfolgte. Nur dort ist ein
+        # Defekt die plausibelste Erklärung — ein Umstieg erklärt nichts,
+        # wenn der Ersatz vom selben Typ ist.
+        "abbruch_gleicher_typ": sum(
+            1
+            for r in rows
+            if (FLAG_ABORTED_IMMEDIATE in r["quality_flag"].split(";")
+                or FLAG_ABORTED_UNDERWAY in r["quality_flag"].split(";"))
+            and r["ersetzt_durch"] == r["vehicle_label"]
+        ),
         "auffaellige_fahrten": [
             f"{r['start_date'][:16]} {r['start_station']} -> {r['end_station']} "
             f"({r['duration_seconds']} s, {r['speed_kmh_luftlinie']} km/h) "

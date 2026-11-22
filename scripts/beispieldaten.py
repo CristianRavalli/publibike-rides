@@ -250,8 +250,8 @@ def main() -> int:
 
     print()
     print(f"{bericht['rides']} Mieten -> {bericht['wege']} Wege -> {ZIEL}/rides_geo.csv")
-    print(f"  Velo lief gar nicht erst:  {bericht['defekt_sofort']}")
-    print(f"  Velo fiel unterwegs aus:   {bericht['defekt_unterwegs']}")
+    print(f"  Abbruch an der Startstation:{bericht['abbruch_sofort']}")
+    print(f"  Abbruch unterwegs:          {bericht['abbruch_unterwegs']}")
     print(f"  Lange Miete, sofort abgelöst: {bericht['neumiete_nach_langer_fahrt']}")
     print(f"  ohne Koordinaten:          {bericht['ohne_koordinaten']}")
     return 0

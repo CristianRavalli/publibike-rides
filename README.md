@@ -50,13 +50,18 @@ Nachmittag.
 
 ![Muster nach Monat, Wochentag und Tagesstunde](docs/muster.png)
 
-Zweitens — und das war die Überraschung — dass sich **defekte Velos in den
-Daten nachweisen lassen**, obwohl die API kein solches Feld kennt. Wer ein
+Zweitens — und das war die Überraschung — dass sich **abgebrochene Mieten in
+den Daten finden lassen**, obwohl die API kein solches Feld kennt. Wer ein
 Velo nimmt, das nicht läuft, und sofort das nächste nimmt, hinterlässt zwei
-Mieten dicht hintereinander. Ob die erste an ihrer Startstation endete, sagt,
-ob der Defekt sofort oder erst unterwegs auffiel. Und ob sie länger als 20
-Minuten dauerte, trennt den Defekt von dem Fall, über dessen Ursache sich
-nichts sagen lässt.
+Mieten dicht hintereinander. 43 von 258 Mieten sehen so aus, ein Sechstel.
+
+Ob daraus ein Defekt wird, ist allerdings die zweite Frage, und sie fällt
+knapper aus als gedacht. Bei 19 dieser Abbrüche kam als Ersatz ein Velo eines
+anderen Typs — meist ein E-Bike nach einem Normalvelo. Ein Defekt erklärt
+das, ein Umstieg aufs bessere Fahrzeug aber genauso gut, und die Daten
+entscheiden es nicht. Belastbar sind die **24 Fälle mit gleichem Typ**: Ein
+E-Bike gegen ein E-Bike zu tauschen ergibt nur Sinn, wenn das erste nicht
+fuhr.
 
 Beide Schwellen liegen in einer Lücke der Verteilung, nicht im Gedränge — sie
 lassen sich verschieben, ohne dass sich das Ergebnis ändert. Das ist der
@@ -95,6 +100,20 @@ derer ein Defekt nicht mehr die naheliegende Erklärung ist.
 Dieselbe Ehrlichkeit verlangt den Nachsatz: Oberhalb der Grenze steht ein
 einziger Datenpunkt. Die Markierung heisst deshalb `neumiete_nach_langer_fahrt`
 und benennt das Beobachtete, nicht ein vermutetes Motiv.
+
+Und dann kam die Korrektur der Korrektur. Beim Versuch, aus den gefundenen
+Ausfällen eine Zuverlässigkeitskennzahl zu bauen, fiel auf, dass Normalvelos
+in 74 % der Fälle abgebrochen werden und E-Bikes nur in 11 %. Ein scheinbar
+harter Befund — bis die Frage kam, was danach genommen wurde. Fast immer ein
+E-Bike. Der Unterschied misst also womöglich nicht die Wartung der
+Normalvelos, sondern die Vorliebe des Fahrers.
+
+Darum heissen die Markierungen heute `abbruch_*` statt `defekt_*`, und darum
+gibt es die Spalte `ersetzt_durch`. Die Reihenfolge ist dabei der eigentliche
+Inhalt: erst eine Regel, die zu wenig fand, dann eine, die zu viel behauptete,
+und am Ende eine, die sagt, was sie sieht. Hätte ich gleich ein Dashboard
+gebaut, stünde dort jetzt «74 % der Normalvelos defekt» — überzeugend
+aussehend und nicht haltbar.
 
 ---
 
@@ -257,18 +276,54 @@ Buchungsartefakt. Solche Zeilen bekommen `quality_flag = tempo_unplausibel`
 drei Minuten nach der vorherigen — auch überlappend —, war es in Wahrheit ein
 Weg. Dafür gibt es drei Gründe, und die Daten erlauben, sie auseinanderzuhalten:
 
-| Markierung | Was passiert ist | Erkennungsmerkmal |
+| Markierung | Was beobachtet wurde | Erkennungsmerkmal |
 |---|---|---|
-| `defekt_sofort` | Das Velo lief gar nicht erst. | Die Miete endet an ihrer Startstation. |
-| `defekt_unterwegs` | Das Velo fiel nach kurzer Fahrt aus; man stellt es ab, wo man ist, und nimmt das nächste, um ans Ziel zu kommen. | Die Miete ging woanders hin und dauerte höchstens 20 Minuten. |
-| `neumiete_nach_langer_fahrt` | Lange Miete, trotzdem sofort abgelöst. Ein Defekt ist hier nicht die naheliegende Erklärung — was es stattdessen war, sagen die Daten nicht. | Die Miete dauerte länger als 20 Minuten. |
+| `abbruch_sofort` | Die Miete endete, wo sie begann — das Velo kam nicht vom Fleck. | Start- und Zielstation gleich, höchstens 20 Minuten. |
+| `abbruch_unterwegs` | Die Miete endete woanders und wurde trotzdem sofort abgelöst. | Andere Zielstation, höchstens 20 Minuten. |
+| `neumiete_nach_langer_fahrt` | Lange Miete, trotzdem sofort abgelöst. Ein Defekt ist hier nicht die naheliegende Erklärung. | Länger als 20 Minuten. |
+
+Keine dieser Markierungen nennt eine Ursache, und das ist Absicht — siehe
+unten.
 
 Beide Schwellen sind unempfindlich, und das spricht für die Regel. Zwischen 60
 und 234 Sekunden kommt keine einzige Lücke vor, also liefern 1, 2 und 3
 Minuten dasselbe. Und die Fahrzeiten springen von 896 Sekunden direkt auf
 1565, also liefert jede Grenze zwischen 15 und 26 Minuten dasselbe. Von 258
-Mieten entfielen 11 auf `defekt_sofort`, 32 auf `defekt_unterwegs` und eine
+Mieten entfielen 11 auf `abbruch_sofort`, 32 auf `abbruch_unterwegs` und eine
 auf `neumiete_nach_langer_fahrt`.
+
+**Ein Abbruch ist noch kein Defekt.** Das ist die wichtigste Einschränkung
+dieses Projekts, und sie kam erst beim Nachrechnen heraus. Auffällig war
+zunächst dies:
+
+| | Abbrüche | Quote | Konfidenzintervall |
+|---|---|---|---|
+| E-Bike | 26 von 235 | 11.1 % | 7.7–15.7 % |
+| Normalvelo | 17 von 23 | 73.9 % | 53.5–87.5 % |
+
+Drei von vier Normalvelos werden abgebrochen, und die Intervalle berühren
+sich nicht einmal. Das sieht nach einem harten Befund über die Normalvelos
+aus — bis man nachsieht, was danach genommen wurde: in **16 von 17** Fällen
+ein E-Bike.
+
+Damit ist die Sache nicht mehr entscheidbar. Ein defektes Normalvelo und ein
+Umstieg aufs E-Bike sehen in den Daten identisch aus: kurze Miete, sofort die
+nächste. Die Spalte `ersetzt_durch` hält deshalb fest, welcher Typ folgte.
+Wird ein Velo durch **denselben** Typ ersetzt, erklärt ein Umstieg nichts und
+der Defekt bleibt die plausibelste Lesart. Über alle 43 Abbrüche:
+
+- **24 mit gleichem Typ**, davon 23 mal E-Bike gegen E-Bike — belastbar.
+- **19 mit Typwechsel** — Defekt oder Umstieg, nicht zu trennen.
+
+Deshalb heissen die Markierungen `abbruch_*` und nicht `defekt_*`. Eine
+frühere Fassung tat Letzteres und behauptete damit über 43 Mieten etwas, das
+für 19 davon nicht belegt ist.
+
+**Eine Aussage über einzelne Stationen tragen die Daten nicht.** 51 Stationen,
+im Median zwei Ausgaben je Station; nur zehn kommen auf fünf oder mehr.
+Hardplatz steht mit 33 % Abbrüchen schlecht da, Wydäckerring mit 7 % gut —
+die Konfidenzintervalle lauten 19–51 % und 2–22 % und überlappen deutlich.
+Eine Stationsrangliste wäre eingefärbtes Rauschen.
 
 Bei der letzten Markierung ist Vorsicht angebracht, und sie steht hier als
 Beispiel dafür, wie weit eine Regel tragen darf. Die 20-Minuten-Grenze liegt

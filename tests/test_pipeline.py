@@ -152,8 +152,8 @@ class TestVorzeitigBeendeteMieten(unittest.TestCase):
         zeile, report = self._erste(
             self._paar("2026-11-05 12:00:00", "2026-11-05 12:00:35", "2026-11-05 12:00:48")
         )
-        self.assertIn("defekt_sofort", zeile["quality_flag"])
-        self.assertEqual(report["defekt_sofort"], 1)
+        self.assertIn("abbruch_sofort", zeile["quality_flag"])
+        self.assertEqual(report["abbruch_sofort"], 1)
 
     def test_velo_fiel_unterwegs_aus(self):
         # Fuhr ein Stueck, dann sofort die naechste Miete: auch ein Defekt.
@@ -163,8 +163,8 @@ class TestVorzeitigBeendeteMieten(unittest.TestCase):
                 kam_vom_fleck=True,
             )
         )
-        self.assertIn("defekt_unterwegs", zeile["quality_flag"])
-        self.assertEqual(report["defekt_unterwegs"], 1)
+        self.assertIn("abbruch_unterwegs", zeile["quality_flag"])
+        self.assertEqual(report["abbruch_unterwegs"], 1)
 
     def test_lange_fahrt_gilt_nicht_als_defekt(self):
         # Ueber 20 Minuten: ein Defekt ist nicht die naheliegendste Erklaerung.
@@ -175,21 +175,21 @@ class TestVorzeitigBeendeteMieten(unittest.TestCase):
             )
         )
         self.assertIn("neumiete_nach_langer_fahrt", zeile["quality_flag"])
-        self.assertEqual(report["defekt_unterwegs"], 0)
+        self.assertEqual(report["abbruch_unterwegs"], 0)
 
     def test_ueberlappung_zaehlt_auch(self):
         # Das naechste Velo wurde genommen, bevor das vorherige verbucht war.
         zeile, _ = self._erste(
             self._paar("2026-11-05 12:00:00", "2026-11-05 12:01:00", "2026-11-05 12:00:19")
         )
-        self.assertIn("defekt_sofort", zeile["quality_flag"])
+        self.assertIn("abbruch_sofort", zeile["quality_flag"])
 
     def test_grosse_luecke_ist_nichts_davon(self):
         zeile, report = self._erste(
             self._paar("2026-11-05 12:00:00", "2026-11-05 12:00:35", "2026-11-05 12:30:00")
         )
         self.assertEqual(zeile["quality_flag"], "")
-        self.assertEqual(report["defekt_sofort"], 0)
+        self.assertEqual(report["abbruch_sofort"], 0)
 
     def test_luecke_wird_eingetragen(self):
         rows, _ = enrich_rides(

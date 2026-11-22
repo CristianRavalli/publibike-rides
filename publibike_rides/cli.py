@@ -217,8 +217,8 @@ def cmd_enrich(_args: argparse.Namespace) -> None:
     print(f"  ohne Koordinaten: {report['ohne_koordinaten']}")
     print()
     print("  Vorzeitig beendete Mieten:")
-    print(f"    Velo lief gar nicht erst:  {report['defekt_sofort']}")
-    print(f"    Velo fiel unterwegs aus:   {report['defekt_unterwegs']}")
+    print(f"    Abbruch an der Startstation:{report['abbruch_sofort']}")
+    print(f"    Abbruch unterwegs:          {report['abbruch_unterwegs']}")
     print(f"    Lange Miete, sofort abgelöst: {report['neumiete_nach_langer_fahrt']}")
     for label, key in (
         ("Unbekannte Startstationen", "unbekannte_startstationen"),

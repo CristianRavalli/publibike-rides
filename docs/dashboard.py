@@ -33,7 +33,7 @@ def js_wert(wert):
 
 # Mit Versionsangabe, damit ein wiederkehrender Besucher nicht die alten
 # Beispieldaten aus dem Cache bekommt. Siehe Kommentar in index.html.
-BEISPIEL = "./beispiel.csv?v=2"
+BEISPIEL = "./beispiel.csv?v=3"
 
 AKZENT = "#6e2c50"
 AKZENT_HELL = "#c39bd3"
@@ -41,12 +41,14 @@ AKZENT_HELL = "#c39bd3"
 WOCHENTAGE = ["Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "Samstag", "Sonntag"]
 
 MARKIERUNGEN = [
-    ("defekt_sofort", "Velo lief gar nicht erst"),
-    ("defekt_unterwegs", "Velo fiel unterwegs aus"),
+    ("abbruch_sofort", "Abbruch an der Startstation"),
+    ("abbruch_unterwegs", "Abbruch unterwegs"),
     ("neumiete_nach_langer_fahrt", "Lange Miete, sofort abgelöst"),
     ("tempo_unplausibel", "Buchungsartefakt"),
     ("station_unbekannt", "Station ohne Koordinaten"),
 ]
+
+ABBRUECHE = {"abbruch_sofort", "abbruch_unterwegs"}
 
 _karte = None
 _ebenen = []
@@ -224,12 +226,25 @@ def zeige_qualitaet(zeilen):
         f'<td class="zahl">{zaehler.get(schluessel, 0)}</td></tr>'
         for schluessel, beschriftung in MARKIERUNGEN
     )
+    # Ein Abbruch sagt nicht, warum abgebrochen wurde. Folgte ein Velo
+    # desselben Typs, bleibt der Defekt die plausibelste Erklärung. Folgte ein
+    # anderer Typ, kann es ebenso gut ein Umstieg gewesen sein.
+    abbrueche = [z for z in zeilen if ABBRUECHE & set((z.get("quality_flag") or "").split(";"))]
+    gleich = sum(1 for z in abbrueche if z.get("ersetzt_durch") == z.get("vehicle_label"))
+    anders = len(abbrueche) - gleich
+
     _text("qualitaet").innerHTML = (
         "<table><thead><tr><th>Was beobachtet wurde</th><th>Markierung</th>"
         '<th class="zahl">Mieten</th></tr></thead>'
         f"<tbody>{reihen}</tbody></table>"
         f'<p class="hinweis">{markiert} von {len(zeilen)} Mieten tragen mindestens '
         "eine Markierung. Mehrere pro Zeile sind möglich.</p>"
+        f'<p class="hinweis"><strong>Von {len(abbrueche)} Abbrüchen wurden {gleich} '
+        f"durch denselben Velotyp ersetzt und {anders} durch einen anderen.</strong> "
+        "Nur bei gleichem Typ ist ein Defekt die plausibelste Erklärung — bei "
+        "einem Wechsel sieht ein Umstieg aufs bessere Fahrzeug in den Daten "
+        "genauso aus. Die Spalte <code>ersetzt_durch</code> macht das "
+        "nachprüfbar.</p>"
     )
 
 
