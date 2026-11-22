@@ -177,6 +177,26 @@ die Dateien neu — zweimal ausgeführt entsteht zweimal dasselbe Ergebnis. Ein
 verpasster Lauf muss deshalb nicht nachgeholt werden, und ein Backfill-Konzept
 braucht es nicht.
 
+**Was sich planen lässt und was nicht.** Drei Dinge, in dieser Reihenfolge:
+
+*Ein Lauf mit gültigem Token braucht niemanden.* `download`, `stations` und
+`enrich` laufen ohne Eingabe durch. Das ist der Normalfall, und dafür genügt
+ein Eintrag in `launchd` oder `cron` auf dem eigenen Rechner.
+
+*Die Erneuerung des Tokens braucht einen Menschen mit Telefon.* Läuft er ab,
+endet der Abruf mit `HTTP 401`, und `login` verlangt eine neue SMS. Das lässt
+sich nicht wegprogrammieren, solange die SMS an ein Telefon geht — **in einer
+GitHub Action oder sonst in der Cloud ist der Abruf deshalb nicht möglich.**
+
+*Diese Erneuerung fällt selten an.* Ein Token vom 18. November 2026 war am
+22. November noch gültig, hielt also mindestens vier Tage. Wie lange genau,
+ist nicht gemessen — die Zahl ist eine Untergrenze und keine Zusage.
+
+Ein geplanter Lauf auf dem eigenen Rechner ist damit praktikabel: Er läuft
+meist durch, und wenn nicht, meldet er sich mit einem `401`. Wie weit sich
+das treiben lässt, steht in
+[Issue #7](https://github.com/CristianRavalli/publibike-rides/issues/7).
+
 ### Einzelne Schritte
 
 ```bash
