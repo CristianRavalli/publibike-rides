@@ -65,6 +65,31 @@ Fahrten — siehe unten.
 
 ---
 
+## Entstehung
+
+Ausgangspunkt war ein Konsolen-Snippet, mit dem ich den Endpunkt der App
+gefunden hatte — Adresse, Header und Pagination standen damit fest, die
+Fahrten liessen sich schon herausholen. Daraus wurde in mehreren Runden dieses
+Werkzeug: die Implementierung entstand mit **Claude**, die Fachentscheide und
+die Datenlogik kommen von mir. Die Commits weisen das mit `Co-Authored-By`
+aus.
+
+Die Regel, die das Projekt über einen blossen Export hinaushebt, geht auf
+einen Irrtum zurück. Die erste Fassung der Abbruch-Erkennung hielt nur jene
+Mieten für Ausfälle, bei denen das Velo gar nicht vom Fleck kam, und sortierte
+32 weitere als harmlose Anschlussfahrten weg. Das war falsch: Ein Velo kann
+auch unterwegs ausfallen — man stellt es ab, wo man gerade ist, und nimmt das
+nächste, um ans Ziel zu kommen. Dass die Miete ein Stück weit führte, sagt
+nicht, dass sie erfolgreich war, sondern nur, wann der Defekt auffiel.
+
+Dieser Unterschied steht in keinen Daten. Er kam aus der Erfahrung, das
+System täglich zu benutzen, und erst danach liess er sich in den Zahlen
+nachweisen — die Fahrzeiten der betroffenen Mieten springen von 14.9 auf 26.1
+Minuten, mit nichts dazwischen. So entstand die 20-Minuten-Grenze, die Defekt
+von bewusstem Zurücksetzen der Gratiszeit trennt.
+
+---
+
 ## Zum Ausprobieren ohne eigenes Konto
 
 Im Repository liegt unter `data/beispiel/` ein **erfundener** Datensatz: 402
@@ -305,6 +330,11 @@ liegt eine kurze Pause, damit der Abruf das Backend nicht belastet. Das
 Werkzeug taugt nicht dazu, an fremde Daten zu kommen, und soll das auch nicht.
 
 Die Stationsdaten stammen aus einem offenen Feed unter CC-BY-4.0.
+
+**Lizenz.** Der Code steht unter der MIT-Lizenz, siehe [LICENSE](LICENSE) —
+benutzen, ändern und weitergeben ist ausdrücklich erlaubt, Gewährleistung gibt
+es keine. Das betrifft nur den Code: Die Fahrtdaten gehören der Person, die
+sie abruft, und liegen ohnehin nie im Repository.
 
 ---
 
