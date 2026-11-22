@@ -280,7 +280,11 @@ def zeige_karte(zeilen):
     mitte_lon = sum(p[1] for p in koordinaten.values()) / len(koordinaten)
 
     if _karte is None:
-        _karte = L.map("karte")
+        # Ohne scrollWheelZoom=False zoomt die Karte, sobald jemand mit dem
+        # Mausrad über sie hinweg weiterlesen will — die Seite bleibt stehen
+        # und der Ausschnitt ist verstellt. Zoomen geht weiterhin über die
+        # Schaltflächen, Verschieben durch Ziehen.
+        _karte = L.map("karte", js_wert({"scrollWheelZoom": False}))
         _karte.setView(js_wert([mitte_lat, mitte_lon]), 13)
         # Der Container wurde eben erst sichtbar gemacht; ohne das hier
         # rechnet Leaflet mit der Grösse von vorher.
