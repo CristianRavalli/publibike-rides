@@ -1,5 +1,8 @@
 # publibike-rides
 
+[![Tests](https://github.com/CristianRavalli/publibike-rides/actions/workflows/tests.yml/badge.svg)](https://github.com/CristianRavalli/publibike-rides/actions/workflows/tests.yml)
+[![Lizenz: MIT](https://img.shields.io/badge/Lizenz-MIT-blue.svg)](LICENSE)
+
 Die eigene Fahrtenhistorie von **PubliBike / Velospot** als CSV herunterladen,
 mit Stationskoordinaten anreichern und auf einer Karte auswerten.
 
@@ -292,6 +295,23 @@ beendete Miete und die Verkettung zu Wegen. Der Schwerpunkt liegt auf den
 Fällen, die *nicht* markiert werden sollen — eine lange Rundfahrt, eine grosse
 Lücke, eine Fahrt über 20 Minuten. Eine Regel, die zu viel einsammelt, fällt
 sonst nicht auf.
+
+In der CI laufen sie bei jedem Push auf Python 3.9, 3.11 und 3.13 — das
+README verspricht 3.9 oder neuer, und ein Versprechen, das nicht geprüft wird,
+ist eine Behauptung. Bewusst ohne `pip install`: Pipeline und Tests kommen
+ohne fremde Pakete aus, und schleicht sich eine Abhängigkeit ein, schlägt der
+Lauf fehl.
+
+Dazu eine zweite Prüfung:
+
+```bash
+python3 scripts/pruefe_notebooks.py
+```
+
+Sie schlägt an, wenn ein Notebook mit Ausgaben eingecheckt wurde. Ausgaben
+enthalten die Daten, auf denen das Notebook lief — Tabellen, Stationsnamen,
+ganze Karten als eingebettetes HTML. Ohne diese Prüfung wäre die Regel weiter
+unten nur ein guter Vorsatz.
 
 ---
 

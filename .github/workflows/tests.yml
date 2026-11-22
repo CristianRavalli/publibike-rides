@@ -1,0 +1,49 @@
+name: Tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  tests:
+    name: Tests auf Python ${{ matrix.python }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # Das README verspricht Python 3.9 oder neuer. Geprüft wird deshalb
+        # die unterste und die oberste unterstützte Fassung, plus eine
+        # dazwischen — sonst ist das Versprechen nur eine Behauptung.
+        python: ["3.9", "3.11", "3.13"]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+
+      # Bewusst kein pip install: Pipeline und Tests kommen ohne fremde
+      # Pakete aus. Schleicht sich eine Abhängigkeit ein, schlägt der Lauf
+      # fehl, und genau das soll er.
+      - name: Tests
+        run: python -m unittest discover tests --verbose
+
+  notebooks:
+    name: Notebooks ohne Ausgaben
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      # Ein ausgeführtes Notebook trägt die Daten, auf denen es lief, in
+      # seinen Ausgaben mit sich. Diese Prüfung verhindert, dass jemand seine
+      # Bewegungsdaten versehentlich mitveröffentlicht.
+      - name: Keine Ausgaben eingecheckt
+        run: python scripts/pruefe_notebooks.py
