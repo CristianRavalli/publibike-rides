@@ -33,7 +33,7 @@ def js_wert(wert):
 
 # Mit Versionsangabe, damit ein wiederkehrender Besucher nicht die alten
 # Beispieldaten aus dem Cache bekommt. Siehe Kommentar in index.html.
-BEISPIEL = "./beispiel.csv?v=3"
+BEISPIEL = "./beispiel.csv?v=4"
 
 AKZENT = "#6e2c50"
 AKZENT_HELL = "#c39bd3"
@@ -282,6 +282,9 @@ def zeige_karte(zeilen):
     if _karte is None:
         _karte = L.map("karte")
         _karte.setView(js_wert([mitte_lat, mitte_lon]), 13)
+        # Der Container wurde eben erst sichtbar gemacht; ohne das hier
+        # rechnet Leaflet mit der Grösse von vorher.
+        _karte.invalidateSize()
         L.tileLayer(
             "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
             js_wert({"attribution": "&copy; OpenStreetMap", "maxZoom": 19}),
@@ -320,6 +323,7 @@ def zeige_karte(zeilen):
                     "radius": 4 + 13 * anzahl / groesster,
                     "color": AKZENT,
                     "weight": 1,
+                    "fill": True,
                     "fillColor": AKZENT_HELL,
                     "fillOpacity": 0.85,
                 }
@@ -329,7 +333,19 @@ def zeige_karte(zeilen):
         kreis.addTo(_karte)
         _ebenen.append(kreis)
 
-    _karte.invalidateSize()
+    # Zum Schluss auf die Daten zoomen statt eine feste Stufe zu behalten.
+    # Das ist nicht nur bequemer, sondern notwendig: Leaflet legt den
+    # Zeichenbereich seiner SVG-Ebene beim Aufbau fest. Hatte der Container
+    # da noch nicht seine endgültige Grösse, bleiben die Formen ausserhalb
+    # und werden als leeres "M0 0" gezeichnet — die Karte zeigt dann Kacheln,
+    # aber weder Kreise noch Linien. fitBounds bewegt die Karte und erzwingt
+    # damit die Neuberechnung.
+    breiten = [p[0] for p in koordinaten.values()]
+    laengen = [p[1] for p in koordinaten.values()]
+    _karte.fitBounds(
+        js_wert([[min(breiten), min(laengen)], [max(breiten), max(laengen)]]),
+        js_wert({"padding": [30, 30]}),
+    )
 
 
 # ------------------------------------------------------------------- Ablauf
