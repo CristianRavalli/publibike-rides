@@ -73,7 +73,10 @@ FAHRWAHRSCHEINLICHKEIT = {0: 0.80, 1: 0.85, 2: 0.78, 3: 0.75, 4: 0.15, 5: 0.10, 
 
 TEMPO_KMH = 12.0  # Luftlinie, daraus wird die Fahrzeit geschätzt
 
-ABO = "BusinessBike Local Zürich - Stadt Zürich"
+# Erfundener Abo-Name. Echte Abo-Bezeichnungen nennen oft den Arbeitgeber,
+# der ein Geschäftsabo stellt — in einem Beispieldatensatz hat so etwas
+# nichts verloren.
+ABO = "Beispielabo Zürich"
 
 
 def _kennung(rng: random.Random) -> str:
